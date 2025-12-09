@@ -1,0 +1,36 @@
+:root {
+  --bg-color: #f0f2f5;
+  --header-bg-color: #ffffff;
+  --sidebar-bg-color: #304156;
+  --text-color: #303133;
+  --header-text-color: #606266;
+}
+
+html.dark {
+  --bg-color: #1a1a1a;
+  --header-bg-color: #1d1e1f;
+  --sidebar-bg-color: #141414;
+  --text-color: #cfd3dc;
+  --header-text-color: #cfd3dc;
+}
+
+/* Apply to elements */
+body {
+  background-color: var(--bg-color);
+  color: var(--text-color);
+  transition: background-color 0.3s, color 0.3s;
+}
+
+.el-header {
+  background-color: var(--header-bg-color) !important;
+  color: var(--header-text-color);
+  border-bottom-color: var(--el-border-color) !important;
+}
+
+.el-aside .el-menu {
+  background-color: var(--sidebar-bg-color) !important;
+}
+
+.el-main {
+  background-color: var(--bg-color) !important;
+}

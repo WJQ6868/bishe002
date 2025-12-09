@@ -1,0 +1,471 @@
+<template>
+  <div class="cert-links-page">
+    <!-- 顶部搜索区 -->
+    <div class="header-section">
+      <div class="title-area">
+        <h2>考试证书链接</h2>
+        <p class="subtitle">一站式考试报名与证书查询入口</p>
+      </div>
+      <div class="search-area">
+        <el-input
+          v-model="searchKeyword"
+          placeholder="搜索考试或证书名称..."
+          class="search-input"
+          :prefix-icon="Search"
+          clearable
+          @input="handleSearch"
+        />
+        <el-button type="warning" plain icon="Star" @click="router.push('/cert/my-collections')">
+          我的收藏
+        </el-button>
+      </div>
+    </div>
+
+    <div class="main-content">
+      <!-- 左侧：分类与列表 -->
+      <div class="left-panel">
+        <!-- 分类导航 -->
+        <div class="category-nav">
+          <div
+            v-for="cat in categories"
+            :key="cat.key"
+            class="category-item"
+            :class="{ active: currentCategory === cat.key }"
+            @click="handleCategoryChange(cat.key)"
+          >
+            <el-icon class="cat-icon"><component :is="cat.icon" /></el-icon>
+            <span>{{ cat.label }}</span>
+          </div>
+        </div>
+
+        <!-- 链接列表 -->
+        <div class="link-list" v-loading="loading">
+          <el-row :gutter="20">
+            <el-col
+              v-for="link in links"
+              :key="link.id"
+              :xs="24"
+              :sm="12"
+              :md="8"
+            >
+              <div class="link-card" @click="openLink(link)">
+                <div class="card-header">
+                  <div class="icon-wrapper">
+                    <el-icon><component :is="link.icon || 'Link'" /></el-icon>
+                  </div>
+                  <div class="header-info">
+                    <h3>{{ link.name }}</h3>
+                    <el-tag v-if="link.is_official" size="small" type="success" effect="plain">官方</el-tag>
+                  </div>
+                  <div class="collect-btn" @click.stop="toggleCollect(link)">
+                    <el-icon :class="{ collected: link.is_collected }">
+                      <StarFilled v-if="link.is_collected" />
+                      <Star v-else />
+                    </el-icon>
+                  </div>
+                </div>
+                <div class="card-desc" :title="link.description">
+                  {{ link.description || '暂无描述' }}
+                </div>
+                <div class="card-footer">
+                  <span class="category-tag">{{ link.category }}</span>
+                  <span class="click-count">
+                    <el-icon><View /></el-icon> {{ link.click_count }}
+                  </span>
+                </div>
+              </div>
+            </el-col>
+          </el-row>
+          <el-empty v-if="links.length === 0" description="暂无相关链接" />
+        </div>
+      </div>
+
+      <!-- 右侧：热门推荐 -->
+      <div class="right-panel">
+        <div class="panel-card hot-links">
+          <div class="panel-header">
+            <h3><el-icon><Trophy /></el-icon> 热门推荐</h3>
+          </div>
+          <div class="hot-list">
+            <div
+              v-for="(link, index) in hotLinks"
+              :key="link.id"
+              class="hot-item"
+              @click="openLink(link)"
+            >
+              <span class="rank" :class="{ top3: index < 3 }">{{ index + 1 }}</span>
+              <span class="name">{{ link.name }}</span>
+              <span class="hot-val"><el-icon><Star /></el-icon></span>
+            </div>
+          </div>
+        </div>
+
+        <div class="panel-card tips-card">
+          <div class="panel-header">
+            <h3><el-icon><InfoFilled /></el-icon> 使用说明</h3>
+          </div>
+          <div class="tips-content">
+            <p>1. 点击卡片可直接跳转至官方网站（新窗口打开）。</p>
+            <p>2. 点击右上角星号 <el-icon><Star /></el-icon> 可收藏常用链接。</p>
+            <p>3. 如发现链接失效，请联系管理员反馈。</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</template>
+
+<script setup lang="ts">
+import { ref, onMounted, computed } from 'vue'
+import { useRouter } from 'vue-router'
+import { 
+  Search, Star, StarFilled, Link, View, Trophy, InfoFilled,
+  Monitor, Reading, Postcard, DataLine, Medal, Van, Microphone, School
+} from '@element-plus/icons-vue'
+import axios from 'axios'
+import { ElMessage } from 'element-plus'
+
+const router = useRouter()
+const loading = ref(false)
+const searchKeyword = ref('')
+const currentCategory = ref('all')
+const links = ref<any[]>([])
+
+const categories = [
+  { key: 'all', label: '全部', icon: 'School' },
+  { key: '计算机类', label: '计算机类', icon: 'Monitor' },
+  { key: '英语类', label: '英语类', icon: 'Reading' },
+  { key: '职业资格类', label: '职业资格类', icon: 'Postcard' },
+  { key: '专业证书类', label: '专业证书类', icon: 'Medal' },
+  { key: '其他', label: '其他', icon: 'Van' }
+]
+
+const hotLinks = computed(() => {
+  return [...links.value].sort((a, b) => b.click_count - a.click_count).slice(0, 5)
+})
+
+const fetchLinks = async () => {
+  loading.value = true
+  try {
+    const params: any = {}
+    if (currentCategory.value !== 'all') params.category = currentCategory.value
+    if (searchKeyword.value) params.keyword = searchKeyword.value
+
+    const response = await axios.get('http://localhost:8000/api/cert/list', {
+      params,
+      headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+    })
+    links.value = response.data
+  } catch (error) {
+    console.error('获取链接失败', error)
+    ElMessage.error('获取链接失败')
+  } finally {
+    loading.value = false
+  }
+}
+
+const handleSearch = () => {
+  fetchLinks()
+}
+
+const handleCategoryChange = (cat: string) => {
+  currentCategory.value = cat
+  fetchLinks()
+}
+
+const openLink = async (link: any) => {
+  window.open(link.url, '_blank')
+  // Record click asynchronously
+  try {
+    await axios.post(`http://localhost:8000/api/cert/click/${link.id}`)
+    link.click_count++
+  } catch (e) {
+    // Ignore error
+  }
+}
+
+const toggleCollect = async (link: any) => {
+  try {
+    const response = await axios.post('http://localhost:8000/api/cert/collect', 
+      { link_id: link.id },
+      { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } }
+    )
+    
+    if (response.data.status === 'collected') {
+      link.is_collected = true
+      ElMessage.success('收藏成功')
+    } else {
+      link.is_collected = false
+      ElMessage.success('已取消收藏')
+    }
+  } catch (error) {
+    ElMessage.error('操作失败')
+  }
+}
+
+onMounted(() => {
+  fetchLinks()
+})
+</script>
+
+<style scoped>
+.cert-links-page {
+  padding: 20px;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.header-section {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 30px;
+  background: white;
+  padding: 20px;
+  border-radius: 8px;
+  box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.05);
+}
+
+.title-area h2 {
+  margin: 0;
+  font-size: 24px;
+  color: #303133;
+}
+
+.subtitle {
+  margin: 5px 0 0;
+  color: #909399;
+  font-size: 14px;
+}
+
+.search-area {
+  display: flex;
+  gap: 15px;
+  align-items: center;
+}
+
+.search-input {
+  width: 300px;
+}
+
+.main-content {
+  display: flex;
+  gap: 20px;
+}
+
+.left-panel {
+  flex: 1;
+}
+
+.right-panel {
+  width: 300px;
+  flex-shrink: 0;
+}
+
+.category-nav {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+}
+
+.category-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  background: white;
+  border-radius: 20px;
+  cursor: pointer;
+  transition: all 0.3s;
+  border: 1px solid #dcdfe6;
+  color: #606266;
+}
+
+.category-item:hover, .category-item.active {
+  color: #409eff;
+  border-color: #409eff;
+  background: #ecf5ff;
+}
+
+.link-card {
+  background: white;
+  border-radius: 8px;
+  padding: 15px;
+  margin-bottom: 20px;
+  cursor: pointer;
+  transition: all 0.3s;
+  border: 1px solid #ebeef5;
+  height: 140px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+.link-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+  border-color: #c6e2ff;
+}
+
+.card-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.icon-wrapper {
+  width: 40px;
+  height: 40px;
+  background: #f0f9eb;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #67c23a;
+  font-size: 20px;
+  flex-shrink: 0;
+}
+
+.header-info {
+  flex: 1;
+  overflow: hidden;
+}
+
+.header-info h3 {
+  margin: 0 0 5px;
+  font-size: 16px;
+  color: #303133;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.collect-btn {
+  padding: 5px;
+  font-size: 20px;
+  color: #dcdfe6;
+  transition: color 0.3s;
+}
+
+.collect-btn:hover {
+  color: #e6a23c;
+}
+
+.collect-btn .collected {
+  color: #e6a23c;
+}
+
+.card-desc {
+  font-size: 13px;
+  color: #909399;
+  line-height: 1.4;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  margin: 10px 0;
+  flex: 1;
+}
+
+.card-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 12px;
+  color: #909399;
+}
+
+.category-tag {
+  background: #f4f4f5;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.click-count {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.panel-card {
+  background: white;
+  border-radius: 8px;
+  padding: 20px;
+  margin-bottom: 20px;
+  box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.05);
+}
+
+.panel-header {
+  border-bottom: 1px solid #ebeef5;
+  padding-bottom: 10px;
+  margin-bottom: 15px;
+}
+
+.panel-header h3 {
+  margin: 0;
+  font-size: 16px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.hot-item {
+  display: flex;
+  align-items: center;
+  padding: 10px 0;
+  cursor: pointer;
+  border-bottom: 1px solid #f5f7fa;
+}
+
+.hot-item:last-child {
+  border-bottom: none;
+}
+
+.hot-item:hover .name {
+  color: #409eff;
+}
+
+.rank {
+  width: 20px;
+  height: 20px;
+  background: #f0f2f5;
+  color: #909399;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  margin-right: 10px;
+  font-weight: bold;
+}
+
+.rank.top3 {
+  background: #f56c6c;
+  color: white;
+}
+
+.name {
+  flex: 1;
+  font-size: 14px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-right: 10px;
+}
+
+.hot-val {
+  color: #f56c6c;
+  font-size: 12px;
+}
+
+.tips-content {
+  font-size: 13px;
+  color: #606266;
+  line-height: 1.6;
+}
+
+.tips-content p {
+  margin: 5px 0;
+}
+</style>

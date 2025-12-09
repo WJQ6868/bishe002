@@ -1,0 +1,30 @@
+# Node / Vite
+node_modules/
+**/node_modules/
+dist/
+**/dist/
+*.tsbuildinfo
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+pnpm-debug.log*
+*.log
+
+# Env & editor
+.env
+.env.*
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# Python / backend
+__pycache__/
+*.py[cod]
+backend/venv/
+venv/
+
+# Misc cache
+.pytest_cache/
+coverage/
