@@ -6,16 +6,19 @@
   "scripts": {
     "dev": "vite",
     "build": "vue-tsc -b && vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "generate-manual": "node scripts/generate_manual.cjs"
   },
   "dependencies": {
     "@mdi/font": "^7.4.47",
     "axios": "^1.7.0",
+    "docx": "^8.5.0",
     "echarts": "^5.5.0",
     "element-plus": "^2.7.0",
     "highlight.js": "^11.11.1",
     "marked": "^17.0.1",
     "pinia": "^2.1.0",
+    "puppeteer": "^23.11.1",
     "qrcode": "^1.5.4",
     "sass": "^1.94.2",
     "socket.io-client": "^4.8.1",

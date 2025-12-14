@@ -111,12 +111,7 @@ const routes: RouteRecordRaw[] = [
         component: () => import('../views/material/TeacherGradeManagement.vue'),
         meta: { title: 'Grade Management', roles: ['teacher'] }
       },
-      {
-        path: 'teacher-lesson-plan',
-        name: 'MaterialTeacherLessonPlan',
-        component: () => import('../views/material/TeacherLessonPlan.vue'),
-        meta: { title: 'Lesson Plan', roles: ['teacher'] }
-      },
+      
       {
         path: 'course-management',
         name: 'MaterialCourseManagement',
@@ -158,12 +153,6 @@ const routes: RouteRecordRaw[] = [
         name: 'MaterialAnalysis',
         component: () => import('../views/material/Analysis.vue'),
         meta: { title: 'Analysis', roles: ['admin', 'teacher'] }
-      },
-      {
-        path: 'ai-qa',
-        name: 'MaterialAiQA',
-        component: () => import('../views/material/AiQA.vue'),
-        meta: { title: 'AI Assistant', roles: ['student', 'teacher'] }
       }
     ]
   },
@@ -233,12 +222,7 @@ const routes: RouteRecordRaw[] = [
         component: () => import('../views/SystemConfig.vue'),
         meta: { title: '系统配置', icon: 'Setting', roles: ['admin'] }
       },
-      {
-        path: 'ai-qa',
-        name: 'AiQA',
-        component: () => import('../views/AiQA.vue'),
-        meta: { title: 'AI 智能助手', icon: 'ChatDotRound', roles: ['student', 'teacher'] }
-      },
+      
       {
         path: 'analysis',
         name: 'Analysis',
@@ -337,6 +321,7 @@ const routes: RouteRecordRaw[] = [
         meta: { title: '上课签到', icon: 'Aim', roles: ['student'] }
       },
       // Teacher Routes
+      
       {
         path: 'teacher/lesson-plan',
         name: 'TeacherLessonPlan',
@@ -397,7 +382,7 @@ router.beforeEach((to, from, next) => {
     if (isLogin) {
       // If already logged in, redirect to appropriate page
       if (userRole === 'student') next('/student/course-select')
-      else if (userRole === 'teacher') next('/teacher/lesson-plan')
+      else if (userRole === 'teacher') next('/teacher/grade-management')
       else next('/dashboard')
     } else {
       next()

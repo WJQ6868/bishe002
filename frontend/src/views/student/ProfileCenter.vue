@@ -3,6 +3,7 @@ import { ref, reactive, computed } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { User, Lock, Location, Bell, Edit, Check, Close } from '@element-plus/icons-vue'
 import { useRouter } from 'vue-router'
+import { clearAuthState } from '../../utils/auth'
 
 const router = useRouter()
 
@@ -196,7 +197,7 @@ const changePassword = async () => {
       
       ElMessage.success('密码修改成功，请重新登录')
       setTimeout(() => {
-        localStorage.removeItem('is_login')
+        clearAuthState()
         router.push('/login')
       }, 1500)
     }

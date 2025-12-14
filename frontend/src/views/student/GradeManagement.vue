@@ -371,10 +371,10 @@ const exportGrades = () => {
 
 <style scoped>
 .grade-management-container {
-  height: 100%;
   display: flex;
   flex-direction: column;
   gap: 20px;
+  padding-bottom: 40px;
 }
 .header-card {
   flex-shrink: 0;
@@ -427,8 +427,7 @@ const exportGrades = () => {
   height: 300px;
 }
 .table-card {
-  flex: 1;
-  overflow: hidden;
+  overflow: visible;
 }
 /* 不及格行样式 */
 :deep(.el-table .fail-row) {

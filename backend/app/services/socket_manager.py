@@ -24,7 +24,7 @@ from sqlalchemy import select
 # 创建 Socket.IO 服务器 (异步模式)
 sio = socketio.AsyncServer(
     async_mode='asgi',
-    cors_allowed_origins=['http://localhost:2003', 'http://localhost:5173'],
+    cors_allowed_origins=['http://localhost:2003', 'http://127.0.0.1:2003', 'http://localhost:5173'],
     cors_credentials=True,
     logger=True,
     engineio_logger=True,

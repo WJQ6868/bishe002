@@ -204,7 +204,7 @@ const getStatusText = (status: string) => {
         <el-input
           v-model="searchKeyword"
           placeholder="搜索学生姓名/课程"
-          prefix-icon="Search"
+          :prefix-icon="Search"
           style="width: 200px; margin-right: 10px"
         />
         <el-select v-model="filterType" placeholder="请假类型" clearable style="width: 120px; margin-right: 10px">

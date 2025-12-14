@@ -2,6 +2,7 @@
 import { ref, onMounted, reactive, computed } from 'vue'
 import * as echarts from 'echarts'
 import { ElMessage } from 'element-plus'
+import { fetchMajors, fetchClasses, type MajorItem, type ClassItem } from '../api/academic'
 
 // 1. 类型定义
 interface StudentAnalysis {
@@ -17,8 +18,11 @@ interface StudentAnalysis {
 // 2. 状态管理
 const filters = reactive({
   grade: '2022级',
-  major: '计算机科学与技术'
+  major: ''
 })
+const majors = ref<MajorItem[]>([])
+const classes = ref<ClassItem[]>([])
+const selectedMajorId = ref<number | null>(null)
 
 const loading = ref(false)
 const riskStudents = ref<StudentAnalysis[]>([])
@@ -56,7 +60,7 @@ const initCharts = () => {
   }
 }
 
-const updateCharts = () => {
+const updateCharts = async () => {
   loading.value = true
   
   // 模拟数据过滤
@@ -100,23 +104,44 @@ const updateCharts = () => {
     ]
   }
   
-  const barOption = {
-    title: { text: '各专业学业预警人数统计', left: 'center' },
-    tooltip: { trigger: 'axis' },
-    xAxis: { type: 'category', data: ['计算机', '软件工程', '网络安全', '人工智能', '大数据'] },
-    yAxis: { type: 'value' },
-    series: [
-      {
-        type: 'bar',
-        data: [
-          { value: 12, itemStyle: { color: '#F56C6C' } }, // >5 标红
-          { value: 3, itemStyle: { color: '#409EFF' } },
-          { value: 8, itemStyle: { color: '#F56C6C' } },
-          { value: 4, itemStyle: { color: '#409EFF' } },
-          { value: 2, itemStyle: { color: '#409EFF' } }
+  let barOption: any
+  if (selectedMajorId.value) {
+    try {
+      classes.value = await fetchClasses(selectedMajorId.value)
+      barOption = {
+        title: { text: '该专业各班级人数统计', left: 'center' },
+        tooltip: { trigger: 'axis' },
+        xAxis: { type: 'category', data: classes.value.map((c) => c.name) },
+        yAxis: { type: 'value', name: '人数' },
+        series: [
+          {
+            type: 'bar',
+            data: classes.value.map((c) => ({ value: c.student_count, itemStyle: { color: '#409EFF' } })),
+            label: { show: true, position: 'top' }
+          }
         ]
       }
-    ]
+    } catch {
+      barOption = {
+        title: { text: '各专业学业预警人数统计', left: 'center' },
+        tooltip: { trigger: 'axis' },
+        xAxis: { type: 'category', data: ['计算机', '软件工程', '网络安全', '人工智能', '大数据'] },
+        yAxis: { type: 'value' },
+        series: [
+          { type: 'bar', data: [12, 3, 8, 4, 2] }
+        ]
+      }
+    }
+  } else {
+    barOption = {
+      title: { text: '各专业学业预警人数统计', left: 'center' },
+      tooltip: { trigger: 'axis' },
+      xAxis: { type: 'category', data: ['计算机', '软件工程', '网络安全', '人工智能', '大数据'] },
+      yAxis: { type: 'value' },
+      series: [
+        { type: 'bar', data: [12, 3, 8, 4, 2] }
+      ]
+    }
   }
   
   scatterChart?.setOption(scatterOption)
@@ -125,8 +150,8 @@ const updateCharts = () => {
   loading.value = false
 }
 
-const handleFilterChange = () => {
-  updateCharts()
+const handleFilterChange = async () => {
+  await updateCharts()
   ElMessage.success('数据已更新')
 }
 
@@ -135,8 +160,16 @@ const handleProcessRisk = (row: StudentAnalysis) => {
   ElMessage.success(`已标记处理学生：${row.name}`)
 }
 
-onMounted(() => {
+onMounted(async () => {
   initCharts()
+  try {
+    majors.value = await fetchMajors()
+    if (majors.value.length) {
+      selectedMajorId.value = majors.value[0].id
+      filters.major = majors.value[0].name
+    }
+  } catch {}
+  await updateCharts()
   window.addEventListener('resize', () => {
     scatterChart?.resize()
     barChart?.resize()
@@ -164,10 +197,8 @@ const rowClassName = ({ row }: { row: StudentAnalysis }) => {
           </el-select>
         </el-form-item>
         <el-form-item label="专业">
-          <el-select v-model="filters.major" @change="handleFilterChange">
-            <el-option label="计算机科学与技术" value="计算机科学与技术" />
-            <el-option label="软件工程" value="软件工程" />
-            <el-option label="人工智能" value="人工智能" />
+          <el-select v-model="selectedMajorId" @change="() => { const m = majors.find(x => x.id === selectedMajorId)!; filters.major = m?.name || ''; handleFilterChange() }" style="min-width: 220px">
+            <el-option v-for="m in majors" :key="m.id" :label="m.name" :value="m.id" />
           </el-select>
         </el-form-item>
       </el-form>

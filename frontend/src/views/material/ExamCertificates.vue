@@ -8,8 +8,9 @@
  * 3. 收藏功能使用 mdi-star 图标，点击有动态反馈
  * 4. 热门推荐列表使用简洁的 v-list 样式
  */
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import axios from 'axios'
+import { io, Socket } from 'socket.io-client'
 
 // --- 类型定义 ---
 interface LinkItem {
@@ -106,7 +107,27 @@ const showSnackbar = (text: string, color: string) => {
 
 onMounted(() => {
   fetchLinks()
+  initRealtime()
+  window.addEventListener('storage', handleStorageSync)
 })
+onUnmounted(() => {
+  socket?.disconnect()
+  window.removeEventListener('storage', handleStorageSync)
+})
+
+let socket: Socket | null = null
+const initRealtime = () => {
+  const host = window.location.hostname
+  socket = io(`http://${host}:8000`, { transports: ['websocket', 'polling'] })
+  socket.on('cert_links_updated', () => {
+    fetchLinks()
+  })
+}
+const handleStorageSync = (e: StorageEvent) => {
+  if (e.key === 'cert_links_version') {
+    fetchLinks()
+  }
+}
 </script>
 
 <template>

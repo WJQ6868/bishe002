@@ -5,8 +5,8 @@
  */
 import { ref, reactive, onMounted, computed, nextTick } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import QRCode from 'qrcode'
 import axios from 'axios'
+import { Search } from '@element-plus/icons-vue'
 
 // --- 类型定义 ---
 interface Student {
@@ -24,25 +24,26 @@ interface CourseOption {
 }
 
 // --- 状态管理 ---
-const activeTab = ref('qrcode')
+const activeTab = ref('code')
 const currentCourseId = ref<number | undefined>(undefined)
 const courses = ref<CourseOption[]>([])
 const students = ref<Student[]>([])
+const signedStudents = ref<string[]>([])
 const loading = ref(false)
 
-// 二维码相关
-const qrCodeUrl = ref('')
+// 签到码相关
+const currentCode = ref('')
 const qrCodeExpire = ref<Date | null>(null)
 const qrCodeTimer = ref<any>(null)
 const isQrCodeActive = ref(false)
 
-// 统计数据
+// 统计数据：与学生端互通，以后端返回的已签到名单为准
 const stats = computed(() => {
   const total = students.value.length
-  const present = students.value.filter(s => s.status === '已签到').length
+  const present = signedStudents.value.length
   const late = students.value.filter(s => s.status === '迟到').length
-  const absent = students.value.filter(s => s.status === '未到').length
   const leave = students.value.filter(s => s.status === '请假').length
+  const absent = Math.max(total - present - late - leave, 0)
   return { total, present, late, absent, leave }
 })
 
@@ -64,7 +65,7 @@ const loadCourses = async () => {
   }
 }
 
-// 加载学生列表 (模拟)
+// 加载学生列表 (当前为演示：静态人数，实时签入按后端记录)
 const loadStudents = () => {
   loading.value = true
   // 模拟生成 30 名学生
@@ -81,7 +82,7 @@ const loadStudents = () => {
   loading.value = false
 }
 
-// 生成二维码
+// 生成签到码
 const generateQrCode = async () => {
   if (!currentCourseId.value) return
   
@@ -95,22 +96,14 @@ const generateQrCode = async () => {
     
     const code = res.data.code
     qrCodeExpire.value = new Date(res.data.expire_time)
-    
-    // 生成二维码图片
-    qrCodeUrl.value = await QRCode.toDataURL(JSON.stringify({
-      code: code,
-      type: 'attendance'
-    }))
+    currentCode.value = code
     
     isQrCodeActive.value = true
     startTimer()
-    ElMessage.success('签到二维码已生成')
-    
-    // 模拟实时签到效果
-    simulateSign()
-    
+    startPolling()
+    ElMessage.success('签到码已生成')
   } catch (error) {
-    ElMessage.error('生成二维码失败')
+    ElMessage.error('生成签到码失败')
   }
 }
 
@@ -129,6 +122,7 @@ const startTimer = () => {
       timeLeft.value = '已过期'
       isQrCodeActive.value = false
       clearInterval(qrCodeTimer.value)
+      stopPolling()
     } else {
       const m = Math.floor(diff / 60000)
       const s = Math.floor((diff % 60000) / 1000)
@@ -137,24 +131,49 @@ const startTimer = () => {
   }, 1000)
 }
 
-// 模拟签到 (演示用)
-const simulateSign = () => {
-  let count = 0
-  const interval = setInterval(() => {
-    if (count >= 25 || !isQrCodeActive.value) {
-      clearInterval(interval)
-      return
-    }
-    
-    // 随机选一个未到的学生签到
-    const absentStudents = students.value.filter(s => s.status === '未到')
-    if (absentStudents.length > 0) {
-      const randomStudent = absentStudents[Math.floor(Math.random() * absentStudents.length)]
-      randomStudent.status = '已签到'
-      randomStudent.sign_time = new Date().toLocaleTimeString()
-    }
-    count++
-  }, 2000) // 每2秒签到一个
+const copyCode = async () => {
+  if (!currentCode.value) return
+  try {
+    await navigator.clipboard.writeText(currentCode.value)
+    ElMessage.success('签到码已复制')
+  } catch {
+    ElMessage.error('复制失败')
+  }
+}
+
+// 真实轮询后端签到记录
+const pollTimer = ref<any>(null)
+const startPolling = () => {
+  if (pollTimer.value) clearInterval(pollTimer.value)
+  pollTimer.value = setInterval(fetchAttendanceRecords, 2000)
+}
+const stopPolling = () => {
+  if (pollTimer.value) {
+    clearInterval(pollTimer.value)
+    pollTimer.value = null
+  }
+}
+const fetchAttendanceRecords = async () => {
+  if (!currentCourseId.value) return
+  try {
+    const today = new Date().toISOString().slice(0, 10)
+    const res = await axios.get('http://localhost:8000/api/attendance/list', {
+      params: { course_id: currentCourseId.value, date: today },
+      headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+    })
+    const list = res.data || []
+    signedStudents.value = list.filter((r: any) => r.status === '已签到').map((r: any) => r.student_name || r.student_id)
+    // 更新统计：仅更新已签到数量，其余按未签到推算
+    const presentIds = new Set(signedStudents.value)
+    students.value.forEach(s => {
+      if (presentIds.has(s.name) || presentIds.has(s.student_id)) {
+        s.status = '已签到'
+        s.sign_time = new Date().toLocaleTimeString()
+      }
+    })
+  } catch (e) {
+    // ignore
+  }
 }
 
 // 手动修改状态
@@ -185,22 +204,25 @@ const exportTable = () => {
       </div>
       
       <el-radio-group v-model="activeTab">
-        <el-radio-button label="qrcode">二维码点名</el-radio-button>
+        <el-radio-button label="code">签到码点名</el-radio-button>
         <el-radio-button label="manual">手动点名</el-radio-button>
       </el-radio-group>
     </div>
     
-    <!-- 二维码点名 -->
-    <div v-if="activeTab === 'qrcode'" class="qrcode-panel">
+    <!-- 签到码点名 -->
+    <div v-if="activeTab === 'code'" class="qrcode-panel">
       <div class="qr-area">
         <div v-if="!isQrCodeActive" class="qr-placeholder">
-          <el-button type="primary" size="large" @click="generateQrCode">开始点名</el-button>
-          <p>生成二维码，学生扫码签到</p>
+          <el-button type="primary" size="large" @click="generateQrCode">生成签到码</el-button>
+          <p>生成签到码，学生输入完成签到</p>
         </div>
         <div v-else class="qr-content">
-          <img :src="qrCodeUrl" alt="签到二维码" />
+          <div class="code-box">{{ currentCode }}</div>
           <div class="timer">
             剩余时间：<span>{{ timeLeft }}</span>
+          </div>
+          <div>
+            <el-button type="primary" size="small" @click="copyCode">复制签到码</el-button>
           </div>
           <p class="status-text">正在签到中...</p>
         </div>
@@ -218,13 +240,17 @@ const exportTable = () => {
             <div class="label">未签到</div>
           </div>
         </div>
+        <div style="margin-top: 16px; text-align: left">
+          <div style="font-weight: 600; margin-bottom: 6px">已签到名单</div>
+          <el-tag v-for="name in signedStudents" :key="name" type="success" style="margin: 4px">{{ name }}</el-tag>
+        </div>
       </div>
     </div>
     
     <!-- 手动点名 -->
     <div v-if="activeTab === 'manual'" class="manual-panel">
       <div class="toolbar">
-        <el-input placeholder="搜索姓名/学号" style="width: 200px" prefix-icon="Search" />
+        <el-input placeholder="搜索姓名/学号" style="width: 200px" :prefix-icon="Search" />
         <el-button type="success" @click="exportTable">导出签到表</el-button>
       </div>
       
@@ -306,6 +332,19 @@ const exportTable = () => {
 .qr-content img {
   width: 300px;
   height: 300px;
+}
+
+.code-box {
+  width: 300px;
+  height: 120px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 32px;
+  font-weight: bold;
+  letter-spacing: 2px;
+  background: #F5F7FA;
+  border-radius: 8px;
 }
 
 .timer {

@@ -2,6 +2,7 @@
 import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { useTheme } from 'vuetify'
+import { clearAuthState } from '../utils/auth'
 
 const router = useRouter()
 const theme = useTheme()
@@ -46,7 +47,7 @@ const toggleTheme = () => {
 }
 
 const logout = () => {
-  localStorage.removeItem('is_login')
+  clearAuthState()
   router.push('/login')
 }
 </script>

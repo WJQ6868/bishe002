@@ -10,6 +10,7 @@ from ..database import get_db
 from ..models.cert import CertLink, UserCollection
 from ..models.user import User
 from ..dependencies.auth import get_current_user, get_current_admin
+from ..services.socket_manager import sio
 
 router = APIRouter(
     prefix="/cert",
@@ -133,6 +134,13 @@ async def create_cert_link(
     db.add(new_link)
     await db.commit()
     await db.refresh(new_link)
+    try:
+        await sio.emit('cert_links_updated', {
+            'action': 'create',
+            'id': new_link.id
+        })
+    except Exception:
+        pass
     return new_link
 
 @router.put("/update/{link_id}", response_model=CertLinkOut)
@@ -154,6 +162,13 @@ async def update_cert_link(
     
     await db.commit()
     await db.refresh(link)
+    try:
+        await sio.emit('cert_links_updated', {
+            'action': 'update',
+            'id': link.id
+        })
+    except Exception:
+        pass
     return link
 
 @router.delete("/delete/{link_id}")
@@ -174,6 +189,13 @@ async def delete_cert_link(
     
     await db.delete(link)
     await db.commit()
+    try:
+        await sio.emit('cert_links_updated', {
+            'action': 'delete',
+            'id': link_id
+        })
+    except Exception:
+        pass
     return {"status": "deleted"}
 
 @router.post("/click/{link_id}")

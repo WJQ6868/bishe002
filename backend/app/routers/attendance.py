@@ -7,6 +7,7 @@ from sqlalchemy import select, and_, func, desc
 from typing import List, Optional
 from datetime import datetime, timedelta
 import uuid
+import random
 
 from ..database import get_db
 from ..models.teaching import Attendance, AttendanceStatus
@@ -34,8 +35,11 @@ async def create_attendance_code(
     if current_user.role != "teacher":
         raise HTTPException(status_code=403, detail="Only teachers can create attendance")
         
-    # 生成唯一码
-    code = str(uuid.uuid4())
+    # 生成 6 位数字签到码（唯一，避免与现存未过期码冲突）
+    while True:
+        code = ''.join(random.choices('0123456789', k=6))
+        if code not in active_codes:
+            break
     expire_time = datetime.now() + timedelta(minutes=data.duration)
     
     active_codes[code] = {

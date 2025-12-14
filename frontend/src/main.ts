@@ -1,6 +1,6 @@
 import { createApp } from 'vue'
 import { createPinia } from 'pinia'
-import ElementPlus from 'element-plus'
+import ElementPlus, { ElMessage } from 'element-plus'
 import 'element-plus/dist/index.css'
 import 'element-plus/theme-chalk/dark/css-vars.css'
 import './styles/theme.css'
@@ -10,6 +10,7 @@ import router from './router'
 import App from './App.vue'
 import axios from 'axios'
 import { sendLog } from './utils/logger'
+import { clearAuthState } from './utils/auth'
 
 const app = createApp(App)
 
@@ -41,7 +42,8 @@ axios.interceptors.response.use(
   (err) => {
     sendLog('error', `Request Failed: ${err.config?.url}`, { status: err.response?.status, message: err.message })
     if (err?.response?.status === 401) {
-      localStorage.removeItem('token')
+      clearAuthState()
+      ElMessage.warning('登录状态已过期，请重新登录')
       router.push('/login')
     }
     return Promise.reject(err)

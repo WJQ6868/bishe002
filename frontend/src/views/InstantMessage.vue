@@ -1,12 +1,13 @@
 <script setup lang="ts">
 import { ref, reactive, onMounted, onUnmounted, nextTick, computed } from 'vue'
-import { ElMessage, ElMessageBox } from 'element-plus'
+import { ElMessage, ElMessageBox, ElNotification } from 'element-plus'
 import { 
   Search, Plus, Delete, Picture, ChatDotRound,
-  CirclePlus, Promotion, MoreFilled, Warning
+  Promotion, MoreFilled, Warning
 } from '@element-plus/icons-vue'
 import { io, Socket } from 'socket.io-client'
 import axios from 'axios'
+import FriendManagement from '../components/FriendManagement.vue'
 
 interface Message {
   id: number
@@ -39,6 +40,11 @@ const inputMessage = ref('')
 const isConnected = ref(false)
 const messageContainerRef = ref<HTMLElement>()
 const loadingHistory = ref(false)
+
+// 好友管理
+const showFriendDialog = ref(false)
+const friendManagementRef = ref<InstanceType<typeof FriendManagement>>()
+const pendingFriendRequests = ref(0)
 
 const currentUser = reactive({
   id: Number(localStorage.getItem('user_id') || '0'),
@@ -103,12 +109,49 @@ const initSocketIO = () => {
       c.status = payload.users.includes(c.user_id) ? 'online' : 'offline'
     })
   })
+  
+  // 好友相关事件监听
+  socket.on('friend_request_received', (data: any) => {
+    ElNotification({
+      title: '新好友申请',
+      message: `${data.from_user_name} 请求添加您为好友`,
+      type: 'info',
+      duration: 5000
+    })
+    pendingFriendRequests.value++
+    friendManagementRef.value?.loadPendingCount()
+  })
+  
+  socket.on('friend_request_processed', (data: any) => {
+    if (data.status === 'accepted') {
+      ElNotification({
+        title: '好友申请已通过',
+        message: `${data.user_name} 接受了您的好友申请`,
+        type: 'success'
+      })
+    }
+  })
+  
+  socket.on('friend_added', (data: any) => {
+    // 刷新联系人列表
+    loadContacts()
+  })
+  
+  socket.on('friend_deleted', (data: any) => {
+    // 刷新联系人列表
+    loadContacts()
+    // 如果正在和被删除的好友聊天，清空消息
+    if (currentContact.value && currentContact.value.user_id === data.user_id) {
+      currentContact.value = null
+      messages.value = []
+    }
+  })
 }
 
 const loadContacts = async () => {
   try {
     const res = await axios.get('/api/chat/contacts')
-    contacts.value = (res.data?.contacts || []).map((item: any) => ({
+    contacts.value = (res.data?.data?.contacts || []).map((item: any) => ({
       user_id: item.user_id,
       name: item.name,
       username: item.username,
@@ -122,14 +165,14 @@ const loadContacts = async () => {
       selectContact(contacts.value[0])
     }
   } catch (err) {
-    ElMessage.error('???????')
+    ElMessage.error('加载联系人列表失败')
   }
 }
 
 const loadUnread = async () => {
   try {
     const res = await axios.get('/api/chat/unread')
-    const details = res.data?.details || {}
+    const details = res.data?.data?.details || {}
     contacts.value.forEach((contact) => {
       contact.unread = details[contact.user_id] || 0
     })
@@ -150,7 +193,7 @@ const loadMessages = async () => {
     scrollToBottom()
     await markConversationRead(currentContact.value.user_id)
   } catch (err) {
-    ElMessage.error('????????')
+    ElMessage.error('加载聊天记录失败')
   } finally {
     loadingHistory.value = false
   }
@@ -199,7 +242,7 @@ const updateContactPreview = (msg: Message) => {
 const sendMessage = () => {
   if (!inputMessage.value.trim() || !currentContact.value) return
   if (!socket || !isConnected.value) {
-    ElMessage.error('??????????')
+    ElMessage.error('连接未建立，无法发送消息')
     return
   }
 
@@ -226,9 +269,9 @@ const sendMessage = () => {
 
 const clearHistory = () => {
   if (!currentContact.value) return
-  ElMessageBox.confirm('?????????????????', '??', {
-    confirmButtonText: '??',
-    cancelButtonText: '??',
+  ElMessageBox.confirm('确定要清空聊天记录吗？', '提示', {
+    confirmButtonText: '确定',
+    cancelButtonText: '取消',
     type: 'warning'
   }).then(() => {
     messages.value = []
@@ -236,11 +279,34 @@ const clearHistory = () => {
 }
 
 const handleImageUpload = () => {
-  ElMessage.info('?????????...')
+  ElMessage.info('图片上传功能开发中...')
 }
 
+// 表情选择器状态
+const showEmojiPicker = ref(false)
+const commonEmojis = [
+  '😀', '😃', '😄', '😁', '😆', '😅', '🤣', '😂',
+  '🙂', '😊', '😇', '🥰', '😍', '🤩', '😘', '😗',
+  '😚', '😙', '😋', '😛', '😜', '🤪', '😝', '🤑',
+  '🤗', '🤭', '🤫', '🤔', '🤐', '🤨', '😐', '😑',
+  '😶', '😏', '😒', '🙄', '😬', '🤥', '😌', '😔',
+  '😪', '🤤', '😴', '😷', '🤒', '🤕', '🤢', '🤮',
+  '🤧', '🥵', '🥶', '😵', '🤯', '🤠', '🥳', '😎',
+  '🤓', '🧐', '😕', '😟', '🙁', '😮', '😯', '😲',
+  '😳', '🥺', '😦', '😧', '😨', '😰', '😥', '😢',
+  '😭', '😱', '😖', '😣', '😞', '😓', '😩', '😫',
+  '🥱', '😤', '😡', '😠', '🤬', '👍', '👎', '👏',
+  '🙌', '👋', '🤝', '🙏', '💪', '❤️', '💔', '⭐',
+  '✨', '💯', '🔥', '👀', '💀', '🎉', '🎊', '🎁'
+]
+
 const handleEmoji = () => {
-  ElMessage.info('???????...')
+  showEmojiPicker.value = !showEmojiPicker.value
+}
+
+const insertEmoji = (emoji: string) => {
+  inputMessage.value += emoji
+  showEmojiPicker.value = false
 }
 
 const scrollToBottom = () => {
@@ -266,7 +332,7 @@ const formatTime = (isoString?: string | null) => {
   if (diff < 86400000) {
     return date.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })
   } else if (diff < 172800000) {
-    return '??'
+    return '昨天'
   }
   return date.toLocaleDateString('zh-CN', { month: 'short', day: 'numeric' })
 }
@@ -281,9 +347,9 @@ const getStatusColor = (status: UserStatus) => {
 
 const getStatusText = (status: UserStatus) => {
   switch (status) {
-    case 'online': return '??'
-    case 'away': return '??'
-    default: return '??'
+    case 'online': return '在线'
+    case 'away': return '离开'
+    default: return '离线'
   }
 }
 
@@ -291,6 +357,16 @@ const filteredContacts = computed(() => {
   if (!searchKeyword.value) return contacts.value
   return contacts.value.filter((c) => c.name.includes(searchKeyword.value) || c.username.includes(searchKeyword.value))
 })
+
+// 打开好友管理
+const openFriendManagement = () => {
+  showFriendDialog.value = true
+}
+
+// 刷新联系人列表（从好友管理调用）
+const handleRefreshContacts = () => {
+  loadContacts()
+}
 </script>
 
 
@@ -299,8 +375,10 @@ const filteredContacts = computed(() => {
     <!-- 左侧联系人列表 -->
     <div class="contacts-panel">
       <div class="panel-header">
-        <h3>消息</h3>
-        <el-button type="primary" :icon="Plus" circle size="small" />
+        <el-badge :value="pendingFriendRequests" :hidden="pendingFriendRequests === 0" :max="99">
+          <h3>消息</h3>
+        </el-badge>
+        <el-button type="primary" :icon="Plus" circle size="small" @click="openFriendManagement" title="好友管理" />
       </div>
       
       <!-- 搜索栏 -->
@@ -342,8 +420,8 @@ const filteredContacts = computed(() => {
           </div>
           
           <!-- 未读数 -->
-          <div class="unread-badge" v-if="contact.unread_count > 0">
-            {{ contact.unread_count > 99 ? '99+' : contact.unread_count }}
+          <div class="unread-badge" v-if="contact.unread > 0">
+            {{ contact.unread > 99 ? '99+' : contact.unread }}
           </div>
         </div>
         
@@ -416,7 +494,27 @@ const filteredContacts = computed(() => {
       <div class="input-area">
         <div class="input-tools">
           <el-button :icon="Picture" circle @click="handleImageUpload" />
-          <el-button circle @click="handleEmoji">😊</el-button>
+          <div class="emoji-picker-wrapper">
+            <el-button circle @click="handleEmoji">😊</el-button>
+            
+            <!-- 表情选择器弹出框 -->
+            <div v-if="showEmojiPicker" class="emoji-picker">
+              <div class="emoji-picker-header">
+                <span>选择表情</span>
+                <el-button text @click="showEmojiPicker = false" size="small">✕</el-button>
+              </div>
+              <div class="emoji-grid">
+                <div 
+                  v-for="emoji in commonEmojis" 
+                  :key="emoji"
+                  class="emoji-item"
+                  @click="insertEmoji(emoji)"
+                >
+                  {{ emoji }}
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
         
         <div class="input-box">
@@ -451,6 +549,13 @@ const filteredContacts = computed(() => {
         {{ isConnected ? '● 已连接' : '○ 未连接' }}
       </p>
     </div>
+    
+    <!-- 好友管理对话框 -->
+    <FriendManagement
+      ref="friendManagementRef"
+      v-model:visible="showFriendDialog"
+      @refresh-contacts="handleRefreshContacts"
+    />
   </div>
 </template>
 
@@ -745,5 +850,62 @@ const filteredContacts = computed(() => {
 
 .send-btn {
   text-align: right;
+}
+
+/* 表情选择器样式 */
+.emoji-picker-wrapper {
+  position: relative;
+  display: inline-block;
+}
+
+.emoji-picker {
+  position: absolute;
+  bottom: 45px;
+  left: 0;
+  width: 320px;
+  max-height: 280px;
+  background: #fff;
+  border: 1px solid #E4E7ED;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  z-index: 1000;
+  overflow: hidden;
+}
+
+.emoji-picker-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 12px;
+  border-bottom: 1px solid #E4E7ED;
+  background: #F5F7FA;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.emoji-grid {
+  display: grid;
+  grid-template-columns: repeat(8, 1fr);
+  gap: 4px;
+  padding: 8px;
+  max-height: 220px;
+  overflow-y: auto;
+}
+
+.emoji-item {
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 24px;
+  cursor: pointer;
+  border-radius: 4px;
+  transition: all 0.2s;
+}
+
+.emoji-item:hover {
+  background: #ECF5FF;
+  transform: scale(1.2);
 }
 </style>

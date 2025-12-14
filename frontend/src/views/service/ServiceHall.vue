@@ -33,9 +33,9 @@
     </div>
 
     <!-- 快捷入口 -->
-    <div class="quick-links">
+    <div class="quick-links" v-if="displayQuickLinks.length">
       <div 
-        v-for="link in quickLinks" 
+        v-for="link in displayQuickLinks" 
         :key="link.id" 
         class="quick-link-card" 
         @click="router.push(link.route)"
@@ -97,6 +97,15 @@ const searchKeyword = ref('')
 const currentCategory = ref('all')
 const services = ref<any[]>([])
 const quickLinks = ref<any[]>([])
+// 过滤占位/自动生成的链接（如 Resource x / Auto-generated quick link）
+const displayQuickLinks = computed(() => {
+  return (quickLinks.value || []).filter((l: any) => {
+    const name = (l?.name || '').toLowerCase()
+    const desc = (l?.description || '').toLowerCase()
+    const isPlaceholder = name.startsWith('resource ') || desc.includes('auto-generated')
+    return !isPlaceholder
+  })
+})
 
 const categories = [
   { key: 'all', label: '全部服务', icon: 'More' },

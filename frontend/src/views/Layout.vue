@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { useRoute, useRouter } from 'vue-router'
-import { computed, ref } from 'vue'
+import { computed, ref, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { OfficeBuilding, Tickets, MagicStick } from '@element-plus/icons-vue'
 import TeacherAIChat from '../components/TeacherAIChat.vue'
@@ -19,6 +19,16 @@ const logoBg = computed(() => isDark.value ? '#1f1f1f' : '#2b3649')
 
 const userRole = ref(localStorage.getItem('user_role') || 'student')
 const userAccount = ref(localStorage.getItem('user_account') || '')
+const systemName = ref('高校智能教务系统')
+onMounted(() => {
+  try {
+    const saved = localStorage.getItem('system_config')
+    if (saved) {
+      const parsed = JSON.parse(saved)
+      systemName.value = parsed?.base?.systemName || systemName.value
+    }
+  } catch {}
+})
 
 
 const handleLogout = () => {
@@ -64,7 +74,6 @@ const menus = computed(() => {
     { path: '/reservation-audit', title: '预约审核', icon: 'Stamp', roles: ['admin'] },
     { path: '/ai-config', title: 'AI客服配置', icon: 'Service', roles: ['admin'] },
     { path: '/system-config', title: '系统配置', icon: 'Setting', roles: ['admin'] },
-    { path: '/ai-qa', title: 'AI 智能助手', icon: 'ChatDotRound', roles: ['student', 'teacher'] },
     { path: '/academic/linkage', title: '专业班级联动', icon: 'Collection', roles: ['admin', 'teacher'] },
     { path: '/instant-message', title: '即时通讯', icon: 'ChatLineRound', roles: ['student', 'teacher'] },
     { path: '/analysis', title: '学情分析', icon: 'DataAnalysis', roles: ['admin', 'teacher'] },
@@ -95,7 +104,7 @@ const roleName = computed(() => {
         :text-color="menuText"
         active-text-color="#409EFF"
       >
-        <div class="logo" :style="{ backgroundColor: logoBg }">高校智能教务系统</div>
+        <div class="logo" :style="{ backgroundColor: logoBg }">{{ systemName }}</div>
         
         <el-menu-item v-for="menu in menus" :key="menu.path" :index="menu.path">
           <el-icon>
@@ -125,6 +134,7 @@ const roleName = computed(() => {
     <TeacherAIChat v-if="userRole === 'teacher'" />
     <!-- 学生端 AI 客服组件 -->
     <StudentAIChat v-if="userRole === 'student'" />
+    
   </el-container>
 </template>
 

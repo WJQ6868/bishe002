@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, nextTick } from 'vue'
+import { ref, computed, nextTick, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import { Upload, Download, Check, Edit } from '@element-plus/icons-vue'
 import * as echarts from 'echarts'
@@ -269,6 +269,11 @@ loadLocalData()
 nextTick(() => {
   initChart()
 })
+
+// 监听成绩变化，动态刷新图表
+watch(studentScores, () => {
+  nextTick(() => updateChart())
+}, { deep: true })
 </script>
 
 <template>
@@ -358,6 +363,7 @@ nextTick(() => {
         :data="studentScores"
         style="width: 100%"
         border
+        height="520"
       >
         <el-table-column prop="studentId" label="学号" width="120" fixed />
         <el-table-column prop="name" label="姓名" width="100" fixed />
@@ -511,7 +517,7 @@ nextTick(() => {
   flex-shrink: 0;
 }
 .chart-container {
-  height: 300px;
+  height: 240px;
 }
 .table-card {
   flex: 1;

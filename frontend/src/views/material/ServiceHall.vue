@@ -17,6 +17,14 @@ const searchKeyword = ref('')
 const currentCategory = ref('all')
 const services = ref<any[]>([])
 const quickLinks = ref<any[]>([])
+const displayQuickLinks = computed(() => {
+  return (quickLinks.value || []).filter((l: any) => {
+    const name = (l?.name || '').toLowerCase()
+    const desc = (l?.description || '').toLowerCase()
+    const isPlaceholder = name.startsWith('resource ') || desc.includes('auto-generated')
+    return !isPlaceholder
+  })
+})
 const loading = ref(false)
 
 const snackbar = reactive({
@@ -149,8 +157,8 @@ onMounted(() => {
         <v-icon color="primary" class="mr-2">mdi-rocket-launch</v-icon>
         快捷入口
       </h3>
-      <v-row>
-        <v-col v-for="link in quickLinks" :key="link.id" cols="12" sm="6" md="3">
+      <v-row v-if="displayQuickLinks.length">
+        <v-col v-for="link in displayQuickLinks" :key="link.id" cols="12" sm="6" md="3">
           <v-hover v-slot="{ isHovering, props }">
             <v-card
               v-bind="props"

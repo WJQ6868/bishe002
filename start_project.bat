@@ -40,7 +40,7 @@ if !errorlevel!==0 (
     call :check_port %BACKEND_PORT%
     if !errorlevel!==0 (
         echo [INFO] Starting Backend on port %BACKEND_PORT%...
-        start "Backend_%BACKEND_PORT%" cmd /k "cd /d ""%BACKEND_DIR%"" && venv\Scripts\python -m uvicorn app.main:app --reload --host 0.0.0.0 --port %BACKEND_PORT%"
+        start "Backend_%BACKEND_PORT%" cmd /k "cd /d ""%BACKEND_DIR%"" && venv\Scripts\python -m uvicorn app.main:socket_app --reload --host 0.0.0.0 --port %BACKEND_PORT%"
     ) else (
         echo [WARN] Port %BACKEND_PORT% is already in use. Skipping Backend start.
     )

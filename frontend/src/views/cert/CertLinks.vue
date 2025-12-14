@@ -18,6 +18,9 @@
         <el-button type="warning" plain icon="Star" @click="router.push('/cert/my-collections')">
           我的收藏
         </el-button>
+        <el-button v-if="isAdmin" type="primary" icon="Plus" @click="openCreateDialog">
+          新增链接
+        </el-button>
       </div>
     </div>
 
@@ -112,11 +115,40 @@
         </div>
       </div>
     </div>
+    <el-dialog v-model="createDialogVisible" title="新增考试证书链接" width="600px">
+      <el-form :model="createForm" :rules="createRules" ref="createFormRef" label-width="100px">
+        <el-form-item label="名称" prop="name">
+          <el-input v-model="createForm.name" placeholder="例如：全国计算机等级考试报名" />
+        </el-form-item>
+        <el-form-item label="分类" prop="category">
+          <el-select v-model="createForm.category" placeholder="选择分类" style="width: 100%">
+            <el-option v-for="cat in categories.filter(c => c.key !== 'all')" :key="cat.key" :label="cat.label" :value="cat.key" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="图标">
+          <el-input v-model="createForm.icon" placeholder="Element Plus 图标名，默认 Link" />
+        </el-form-item>
+        <el-form-item label="链接地址" prop="url">
+          <el-input v-model="createForm.url" placeholder="https://..." />
+        </el-form-item>
+        <el-form-item label="描述">
+          <el-input v-model="createForm.description" type="textarea" :rows="3" placeholder="简要说明该链接用途" />
+        </el-form-item>
+        <el-form-item label="标记">
+          <el-checkbox v-model="createForm.is_hot">热门</el-checkbox>
+          <el-checkbox v-model="createForm.is_official" style="margin-left: 16px">官方</el-checkbox>
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="createDialogVisible = false">取消</el-button>
+        <el-button type="primary" @click="submitCreate">保存</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted, onUnmounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { 
   Search, Star, StarFilled, Link, View, Trophy, InfoFilled,
@@ -124,12 +156,14 @@ import {
 } from '@element-plus/icons-vue'
 import axios from 'axios'
 import { ElMessage } from 'element-plus'
+import { io, Socket } from 'socket.io-client'
 
 const router = useRouter()
 const loading = ref(false)
 const searchKeyword = ref('')
 const currentCategory = ref('all')
 const links = ref<any[]>([])
+const isAdmin = ref(localStorage.getItem('user_role') === 'admin')
 
 const categories = [
   { key: 'all', label: '全部', icon: 'School' },
@@ -205,7 +239,66 @@ const toggleCollect = async (link: any) => {
 
 onMounted(() => {
   fetchLinks()
+  initRealtime()
+  window.addEventListener('storage', handleStorageSync)
 })
+onUnmounted(() => {
+  socket?.disconnect()
+  window.removeEventListener('storage', handleStorageSync)
+})
+
+let socket: Socket | null = null
+const initRealtime = () => {
+  const host = window.location.hostname
+  socket = io(`http://${host}:8000`, { transports: ['websocket', 'polling'] })
+  socket.on('cert_links_updated', () => {
+    fetchLinks()
+  })
+}
+const handleStorageSync = (e: StorageEvent) => {
+  if (e.key === 'cert_links_version') {
+    fetchLinks()
+  }
+}
+
+// 创建链接弹窗与提交
+const createDialogVisible = ref(false)
+const createFormRef = ref()
+const createForm = ref({
+  name: '',
+  category: '计算机类',
+  icon: 'Link',
+  url: '',
+  description: '',
+  is_hot: false,
+  is_official: true
+})
+const createRules = {
+  name: [{ required: true, message: '请输入名称', trigger: 'blur' }],
+  category: [{ required: true, message: '请选择分类', trigger: 'change' }],
+  url: [{ required: true, message: '请输入链接地址', trigger: 'blur' }]
+}
+const openCreateDialog = () => {
+  createDialogVisible.value = true
+}
+const submitCreate = async () => {
+  try {
+    await createFormRef.value.validate()
+    const resp = await axios.post('http://localhost:8000/api/cert/create', createForm.value, {
+      headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+    })
+    ElMessage.success('创建成功')
+    createDialogVisible.value = false
+    // 重置表单
+    createForm.value = { name: '', category: '计算机类', icon: 'Link', url: '', description: '', is_hot: false, is_official: true }
+    // 刷新列表
+    fetchLinks()
+    // 通知其他标签页
+    localStorage.setItem('cert_links_version', String(Date.now()))
+  } catch (e) {
+    ElMessage.error('创建失败')
+  }
+}
 </script>
 
 <style scoped>

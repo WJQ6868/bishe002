@@ -11,6 +11,7 @@ from .routers import (
     course,
     dashboard,
     data_sync,
+    friend,
     homework,
     leave,
     log,
@@ -27,6 +28,13 @@ import os
 from .database import engine, Base
 from .logging_config import configure_logging
 import logging
+from sqlalchemy.future import select
+from .database import AsyncSessionLocal
+from .models.user import User, UserProfile
+from .models.admin import Admin
+from .models.course import Teacher
+from .models.student import Student
+from .dependencies.auth import get_password_hash
 
 # Configure logging at startup
 configure_logging()
@@ -62,6 +70,8 @@ app.add_middleware(
 # 创建 Socket.IO ASGI 应用（可选）
 if socketio and sio:
     socket_app = socketio.ASGIApp(sio, app)
+else:
+    socket_app = app
 
 # Create tables on startup (for dev purposes)
 @app.on_event("startup")
@@ -71,6 +81,28 @@ async def startup():
     # 仅创建数据表，严格不写入任何模拟数据
     # 引入 Admin 模型以确保管理员表被创建
     from .models.admin import Admin  # noqa: F401
+    async with AsyncSessionLocal() as db:
+        defaults = [
+            {"username": "800001", "role": "admin", "name": "Admin Office", "dept": "Academic Affairs"},
+            {"username": "100001", "role": "teacher", "name": "Teacher Zhang", "dept": "Computer Science"},
+            {"username": "20230001", "role": "student", "name": "Student Li", "dept": "Computer Science", "grade": "2023"},
+        ]
+        for d in defaults:
+            res = await db.execute(select(User).where(User.username == d["username"]))
+            u = res.scalars().first()
+            if not u:
+                u = User(username=d["username"], password=get_password_hash("123456"), role=d["role"], is_active=True)
+                db.add(u)
+                await db.flush()
+                profile = UserProfile(user_id=u.id, name=d["name"], dept=d.get("dept"), grade=d.get("grade"))
+                db.add(profile)
+                if d["role"] == "admin":
+                    db.add(Admin(id=d["username"], name=d["name"], dept=d.get("dept")))
+                elif d["role"] == "teacher":
+                    db.add(Teacher(id=d["username"], name=d["name"]))
+                elif d["role"] == "student":
+                    db.add(Student(id=d["username"], name=d["name"], major=d.get("dept"), grade=d.get("grade")))
+        await db.commit()
 
 _routers = [
     course.router,
@@ -79,6 +111,7 @@ _routers = [
     ai_qa.router,
     analysis.router,
     message.router,   # 即时通讯路由
+    friend.router,    # 好友管理路由
     leave.router,     # 请假管理路由
     attendance.router,
     homework.router,

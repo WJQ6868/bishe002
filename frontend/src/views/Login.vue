@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { reactive, ref } from 'vue'
+import { reactive, ref, onMounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, FormInstance, FormRules } from 'element-plus'
 import axios from 'axios'
@@ -23,6 +23,28 @@ const form = reactive<LoginForm>({
   role: 'student' // 默认学生
 })
 
+// 读取系统配置（演示：来自 SystemConfig 保存的 localStorage）
+const systemName = ref('高校智能教务系统')
+const loginBgKey = ref('')
+const loginBgUrl = computed(() => {
+  const map: Record<string, string> = {
+    bg1: 'https://picsum.photos/1200/800?random=1',
+    bg2: 'https://picsum.photos/1200/800?random=2',
+    bg3: 'https://picsum.photos/1200/800?random=3'
+  }
+  return map[loginBgKey.value] || ''
+})
+onMounted(() => {
+  try {
+    const saved = localStorage.getItem('system_config')
+    if (saved) {
+      const parsed = JSON.parse(saved)
+      systemName.value = parsed?.base?.systemName || systemName.value
+      loginBgKey.value = parsed?.base?.loginBg || ''
+    }
+  } catch {}
+})
+
 // 3. 校验规则
 const validateAccount = (rule: any, value: string, callback: any) => {
   if (value === '') {
@@ -33,9 +55,26 @@ const validateAccount = (rule: any, value: string, callback: any) => {
         callback(new Error('学生账号需为8位数字'))
         return
       }
-    } else {
+      if (!value.startsWith('2')) {
+        callback(new Error('学生账号应以2开头'))
+        return
+      }
+    } else if (form.role === 'teacher') {
       if (!/^\d{6}$/.test(value)) {
-        callback(new Error('教师/管理员账号需为6位数字'))
+        callback(new Error('教师账号需为6位数字'))
+        return
+      }
+      if (!value.startsWith('1')) {
+        callback(new Error('教师账号应以1开头'))
+        return
+      }
+    } else if (form.role === 'admin') {
+      if (!/^\d{6}$/.test(value)) {
+        callback(new Error('管理员账号需为6位数字'))
+        return
+      }
+      if (!value.startsWith('8')) {
+        callback(new Error('管理员账号应以8开头'))
         return
       }
     }
@@ -63,7 +102,8 @@ const handleLogin = async (formEl: FormInstance | undefined) => {
       try {
         const response = await axios.post('http://localhost:8000/token', {
           username: form.account,
-          password: form.password
+          password: form.password,
+          role: form.role  // 发送选择的角色
         })
         const { access_token } = response.data
         
@@ -90,7 +130,7 @@ const handleLogin = async (formEl: FormInstance | undefined) => {
         if (actualRole === 'student') {
           router.push('/student/course-select')
         } else if (actualRole === 'teacher') {
-          router.push('/teacher/lesson-plan')
+          router.push('/teacher/grade-management')
         } else {
           router.push('/dashboard')
         }
@@ -125,10 +165,10 @@ const handleRoleChange = () => {
 </script>
 
 <template>
-  <div class="login-container">
+  <div class="login-container" :style="loginBgUrl ? { backgroundImage: `url(${loginBgUrl})`, backgroundSize: 'cover', backgroundPosition: 'center' } : {}">
     <div class="login-card">
       <div class="title-container">
-        <h2>高校智能教务系统</h2>
+        <h2>{{ systemName }}</h2>
         <p class="subtitle">Smart University Academic System</p>
       </div>
       
@@ -153,7 +193,7 @@ const handleRoleChange = () => {
         <el-form-item prop="account">
           <el-input 
             v-model="form.account" 
-            :placeholder="form.role === 'student' ? '请输入学号 (8位)' : '请输入工号 (6位)'"
+            :placeholder="form.role === 'student' ? '请输入学号 (8位，2开头)' : form.role === 'teacher' ? '请输入工号 (6位，1开头)' : '请输入工号 (6位，8开头)'"
             :prefix-icon="User"
           />
         </el-form-item>

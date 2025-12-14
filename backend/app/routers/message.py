@@ -205,10 +205,16 @@ async def get_chat_contacts(
     current_user: User = Depends(get_current_user)
 ):
     """
-    基于选课关系返回可聊天联系人列表
+    返回可聊天联系人列表
+    - 基于选课关系的联系人
+    - 好友列表
     """
+    from ..models.friend import Friendship
+    
     usernames: Set[str] = set()
+    contact_user_ids: Set[int] = set()
 
+    # 1. 获取课程相关联系人
     if current_user.role == "student":
         stmt = (
             select(Teacher.id)
@@ -232,18 +238,39 @@ async def get_chat_contacts(
         result = await db.execute(stmt)
         usernames.update(row[0] for row in result)
 
-    if not usernames:
+    # 转换username为user_id
+    if usernames:
+        user_id_stmt = select(User.id).where(User.username.in_(usernames))
+        user_id_result = await db.execute(user_id_stmt)
+        contact_user_ids.update(row[0] for row in user_id_result)
+    
+    # 2. 获取好友列表
+    friendship_stmt = select(Friendship).where(
+        or_(
+            Friendship.user_id_1 == current_user.id,
+            Friendship.user_id_2 == current_user.id
+        )
+    )
+    friendship_result = await db.execute(friendship_stmt)
+    for friendship in friendship_result.scalars():
+        friend_id = friendship.get_friend_id(current_user.id)
+        if friend_id:
+            contact_user_ids.add(friend_id)
+
+    if not contact_user_ids:
         return success_response({"contacts": []})
 
+    # 3. 查询联系人详细信息
     user_stmt = (
         select(User, UserProfile)
         .outerjoin(UserProfile, UserProfile.user_id == User.id)
-        .where(User.username.in_(usernames))
+        .where(User.id.in_(contact_user_ids))
     )
     rows = await db.execute(user_stmt)
     contact_entries = rows.all()
     contact_ids = [user.id for user, _ in contact_entries]
 
+    # 4. 查询未读消息数
     unread_map: Dict[int, int] = {}
     if contact_ids:
         unread_stmt = (
@@ -260,6 +287,7 @@ async def get_chat_contacts(
         unread_rows = await db.execute(unread_stmt)
         unread_map = {row[0]: row[1] for row in unread_rows}
 
+    # 5. 查询最后一条消息
     last_map: Dict[int, Dict[str, datetime]] = {}
     for contact_id in contact_ids:
         last_stmt = (
@@ -281,11 +309,12 @@ async def get_chat_contacts(
                 "time": last_msg.send_time,
             }
     
-    # 获取在线状态
+    # 6. 获取在线状态
     status_stmt = select(UserStatus).where(UserStatus.user_id.in_(contact_ids))
     status_res = await db.execute(status_stmt)
     status_map = {s.user_id: s.status for s in status_res.scalars().all()}
 
+    # 7. 构建响应
     contacts_payload = []
     for user, profile in contact_entries:
         last_info = last_map.get(user.id)
