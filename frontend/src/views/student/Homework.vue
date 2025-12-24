@@ -53,7 +53,7 @@ onMounted(() => {
 const loadHomeworks = async () => {
   loading.value = true
   try {
-    const res = await axios.get('http://localhost:8000/api/homework/list', {
+    const res = await axios.get('/homework/list', {
       headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
     })
     // 模拟处理：实际后端返回的列表可能不包含提交状态，需要额外查询或后端聚合
@@ -132,7 +132,7 @@ const submitHomework = async () => {
   
   submitting.value = true
   try {
-    await axios.post('http://localhost:8000/api/homework/submit', {
+    await axios.post('/homework/submit', {
       homework_id: currentHomework.value.id,
       content: submitForm.content,
       file_url: submitForm.file_url
@@ -252,7 +252,7 @@ const getStatusTag = (status?: string) => {
           <el-form-item label="附件上传">
             <el-upload
               class="upload-demo"
-              action="http://localhost:8000/api/leave/upload" 
+              action="/api/leave/upload" 
               :headers="uploadHeaders"
               :on-success="handleUploadSuccess"
               :limit="1"

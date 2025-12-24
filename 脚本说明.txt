@@ -1,0 +1,26 @@
+start_project.bat
+  Windows 下一键启动脚本：检查 backend venv 与 frontend node_modules，避免重复启动后端/前端进程，分别在 8000/2003 端口启动 uvicorn 与 Vite dev server，并把 PID 写入 backend.pid/frontend.pid，日志输出到 backend.log/frontend.log。
+
+stop_project.bat
+  Windows 下一键停止脚本：读取 PID 文件或扫描端口 8000/2003，强制结束 uvicorn 与 Node 进程，清理 pid 文件，确保本地开发环境干净。
+
+sync_to_linux.bat
+  Windows 构建&打包脚本：在 frontend 目录执行构建（默认运行 vue-tsc+vite，可通过 --fast 或 SYNC_FRONTEND_FAST=1 跳过类型检查），随后把指定 backend 文件与 dist 产物复制到 one-linux 目录供部署使用。
+
+push_one_linux.bat
+  Windows 上传脚本：在 one-linux 子仓库中执行 git add/commit/push；如未提供 commit message 自动生成时间戳信息，并保持 origin/master 与 origin/main 两个分支同步到 https://github.com/WJQ6868/one-liunx.git。
+
+one-linux/deploy.sh
+  Linux 服务器一键部署入口：设置 nginx.conf 根目录、授予 scripts 下脚本执行权限，串联 install.sh 完成依赖安装并调用 start.sh 启动整套系统，适用于首次或全量部署。
+
+one-linux/scripts/install.sh
+  Linux 环境初始化脚本：以 root 身份执行系统更新、装 Node.js 20、Python3/pip/venv、Nginx、必要的编译工具与 swap，然后在 backend 创建 venv 安装 requirements、构建 frontend、安装 nginx 站点配置并重启 nginx。
+
+one-linux/scripts/start.sh
+  Linux 启动脚本：在 backend venv 中通过 uvicorn app.main:socket_app 启动后端（写 backend.pid、backend.log），随后重启 Nginx，供生产环境启动或重启使用。
+
+one-linux/scripts/stop.sh
+  Linux 停止脚本：根据 backend.pid（或直接 pkill uvicorn）关闭后端进程，同时提示 Nginx 仍保持运行，需要时手工 systemctl stop nginx。
+
+one-linux/scripts/update_code.sh
+  Linux 更新脚本：位于服务器 one-linux 仓库中，进入项目根目录后执行 git fetch origin main + git reset --hard origin/main，把本地代码同步为远程 main，适合在线更新代码后再运行 start/deploy。

@@ -40,7 +40,7 @@ const teachers = ['张教授', '李副教授', '王讲师', '赵博士', '钱老
 
 const fetchCourses = async () => {
   try {
-    const res = await axios.get('http://localhost:8000/api/course/list', {
+    const res = await axios.get('/course/list', {
       headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
     })
     courses.value = res.data.map((c: any) => ({
@@ -122,14 +122,14 @@ const handleConfirm = () => {
 
 // --- 4. 计算属性 ---
 const headers = [
-  { title: '编号', key: 'code', align: 'start' },
+  { title: '编号', key: 'code', align: 'start' as const },
   { title: '课程名称', key: 'name' },
-  { title: '学分', key: 'credits', align: 'center' },
+  { title: '学分', key: 'credits', align: 'center' as const },
   { title: '类型', key: 'type' },
   { title: '授课教师', key: 'teacher' },
   { title: '选课情况', key: 'enrolled', width: '200px' },
-  { title: '评估状态', key: 'isEvaluated', align: 'center' },
-  { title: '操作', key: 'actions', sortable: false, align: 'end' },
+  { title: '评估状态', key: 'isEvaluated', align: 'center' as const },
+  { title: '操作', key: 'actions', sortable: false, align: 'end' as const },
 ]
 
 const tableData = computed(() => {

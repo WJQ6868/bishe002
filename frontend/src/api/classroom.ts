@@ -21,7 +21,7 @@ export interface ClassroomResponse extends ClassroomPayload {
   status: ResourceStatus
 }
 
-const BASE_URL = 'http://localhost:8000/api/classroom'
+const BASE_URL = '/api/classroom'
 
 const authHeaders = () => {
   const token = localStorage.getItem('token')

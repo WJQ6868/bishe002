@@ -188,7 +188,7 @@ const loadMessages = async () => {
     const res = await axios.get('/api/chat/history', {
       params: { to_id: currentContact.value.user_id, page: 1, size: 100 }
     })
-    messages.value = res.data?.list || []
+    messages.value = res.data?.data?.list || []
     await nextTick()
     scrollToBottom()
     await markConversationRead(currentContact.value.user_id)

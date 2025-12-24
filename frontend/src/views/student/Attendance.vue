@@ -38,7 +38,7 @@ const submitSign = async () => {
   
   signing.value = true
   try {
-    const res = await axios.post('http://localhost:8000/api/attendance/sign', {
+    const res = await axios.post('/attendance/sign', {
       code: signCode.value,
       student_id: 0, // 后端会从 token 获取
       location: 'classroom' // 模拟定位

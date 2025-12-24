@@ -17,7 +17,7 @@ const snackbarColor = ref('error')
 const fetchStats = async () => {
   loading.value = true
   try {
-    const res = await axios.get('http://localhost:8000/api/dashboard/stats', {
+    const res = await axios.get('/dashboard/stats', {
       headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
     })
     stats.value = res.data

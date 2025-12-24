@@ -1,7 +1,9 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Delete, Search } from '@element-plus/icons-vue'
+import axios from 'axios'
+import { useTables } from '@/composables/useTables'
 
 // --- 1. 类型定义 ---
 /**
@@ -37,76 +39,11 @@ interface HistoryCourse {
 // 真实场景下需从系统配置接口获取管理员设置的退课周期
 const dropDeadline = '2025-12-10 23:59:59'
 
-// 当前已选课程（5门）
-const selectedCourses = ref<SelectedCourse[]>([
-  {
-    id: 1,
-    courseName: '数据库原理',
-    courseId: 'CS301',
-    credit: 4,
-    teacher: '黄教授',
-    time: '周一 1-2节, 周三 3-4节',
-    location: '教学楼A101',
-    remain: 5,
-    semester: '2024-2025-1'
-  },
-  {
-    id: 2,
-    courseName: '软件工程',
-    courseId: 'CS302',
-    credit: 3,
-    teacher: '徐老师',
-    time: '周二 5-6节',
-    location: '教学楼B203',
-    remain: 8,
-    semester: '2024-2025-1'
-  },
-  {
-    id: 3,
-    courseName: '算法设计',
-    courseId: 'CS303',
-    credit: 3,
-    teacher: '杨教授',
-    time: '周四 1-2节',
-    location: '教学楼A305',
-    remain: 3,
-    semester: '2024-2025-1'
-  },
-  {
-    id: 4,
-    courseName: '人工智能导论',
-    courseId: 'CS304',
-    credit: 3,
-    teacher: '马老师',
-    time: '周五 3-4节',
-    location: '教学楼C102',
-    remain: 12,
-    semester: '2024-2025-1'
-  },
-  {
-    id: 5,
-    courseName: 'Web开发技术',
-    courseId: 'CS305',
-    credit: 2,
-    teacher: '冯老师',
-    time: '周三 7-8节',
-    location: '实验楼201',
-    remain: 6,
-    semester: '2024-2025-1'
-  }
-])
+// 当前已选课程（优先走数据库；接口不可用时回退本地缓存）
+const selectedCourses = ref<SelectedCourse[]>([])
 
-// 选课历史（8门）
-const courseHistory = ref<HistoryCourse[]>([
-  { id: 1, courseName: '高等数学A', courseId: 'MATH101', credit: 4, score: 92, semester: '2023-2024-1', status: '已完成', teacher: '张教授' },
-  { id: 2, courseName: '大学英语', courseId: 'ENG101', credit: 3, score: 85, semester: '2023-2024-1', status: '已完成', teacher: '李老师' },
-  { id: 3, courseName: '计算机导论', courseId: 'CS101', credit: 3, score: 78, semester: '2023-2024-1', status: '已完成', teacher: '王老师' },
-  { id: 4, courseName: '线性代数', courseId: 'MATH102', credit: 3, score: null, semester: '2023-2024-1', status: '已退课', teacher: '赵教授' },
-  { id: 5, courseName: '数据结构', courseId: 'CS201', credit: 4, score: 82, semester: '2023-2024-2', status: '已完成', teacher: '陈教授' },
-  { id: 6, courseName: '概率论', courseId: 'MATH201', credit: 3, score: 75, semester: '2023-2024-2', status: '已完成', teacher: '周老师' },
-  { id: 7, courseName: '操作系统', courseId: 'CS202', credit: 3, score: 86, semester: '2023-2024-2', status: '已完成', teacher: '吴教授' },
-  { id: 8, courseName: '大学物理', courseId: 'PHY101', credit: 3, score: null, semester: '2023-2024-2', status: '已退课', teacher: '孙教授' }
-])
+// 选课历史（优先走数据库成绩记录；接口不可用时回退本地缓存）
+const courseHistory = ref<HistoryCourse[]>([])
 
 // --- 3. 状态管理 ---
 const activeTab = ref('selected')
@@ -114,6 +51,80 @@ const loading = ref(false)
 const semesterFilter = ref('')
 const statusFilter = ref('')
 const searchKeyword = ref('')
+
+const studentAccount = localStorage.getItem('user_account') || ''
+const { rows: tableRows, reloadTables } = useTables(['grades', 'courses', 'teachers'])
+
+const teacherMap = computed<Record<string, string>>(() => {
+  const map: Record<string, string> = {}
+  tableRows('teachers').forEach((t: any) => {
+    map[String(t.id)] = t.name || String(t.id)
+  })
+  return map
+})
+
+const courseMap = computed<Record<number, any>>(() => {
+  const map: Record<number, any> = {}
+  tableRows('courses').forEach((c: any) => {
+    map[Number(c.id)] = c
+  })
+  return map
+})
+
+const dbHistory = computed<HistoryCourse[]>(() => {
+  const grades = tableRows('grades').filter((g: any) => !studentAccount || g.student_id === studentAccount)
+  return grades
+    .map((g: any) => {
+      const course = courseMap.value[Number(g.course_id)]
+      const teacherName = course ? (teacherMap.value[String(course.teacher_id)] || String(course.teacher_id)) : '未设置'
+      const semester = course?.create_time ? String(course.create_time).slice(0, 7) : '未分类'
+      return {
+        id: Number(g.id),
+        courseName: course?.name || '未设置课程',
+        courseId: course ? String(course.id) : String(g.course_id),
+        credit: Number(course?.credit || 0),
+        score: g.score == null ? null : Number(g.score),
+        semester,
+        status: '已完成',
+        teacher: teacherName,
+      } as HistoryCourse
+    })
+    .sort((a, b) => String(b.semester).localeCompare(String(a.semester)))
+})
+
+const loadSelectedFromDb = async () => {
+  const res = await axios.get('/course/student/list', {
+    headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+  })
+  const list = Array.isArray(res.data) ? res.data : []
+  const teacherNameById: Record<string, string> = {}
+
+  await Promise.all(list.map(async (c: any) => {
+    try {
+      const tRes = await axios.get(`/course/${c.id}/teacher`, {
+        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+      })
+      teacherNameById[String(c.id)] = tRes.data?.name || ''
+    } catch {
+      teacherNameById[String(c.id)] = ''
+    }
+  }))
+
+  selectedCourses.value = list.map((c: any) => {
+    const semester = c?.create_time ? String(c.create_time).slice(0, 7) : '未分类'
+    return {
+      id: Number(c.id),
+      courseName: c.name,
+      courseId: String(c.id),
+      credit: Number(c.credit || 0),
+      teacher: teacherNameById[String(c.id)] || String(c.teacher_id || ''),
+      time: '—',
+      location: '—',
+      remain: Number(c.capacity || 0),
+      semester,
+    }
+  })
+}
 
 // 退课截止时间判断
 const isDropAllowed = computed(() => {
@@ -216,7 +227,7 @@ const dropCourse = (course: SelectedCourse) => {
   })
 }
 
-// 加载本地数据
+// 加载本地数据（兜底）
 const loadLocalData = () => {
   const savedSelected = localStorage.getItem('selected_courses')
   if (savedSelected) {
@@ -229,7 +240,26 @@ const loadLocalData = () => {
   }
 }
 
-loadLocalData()
+const loadAll = async () => {
+  loading.value = true
+  try {
+    await loadSelectedFromDb()
+    await reloadTables(true)
+    courseHistory.value = dbHistory.value
+
+    // 缓存一份，便于离线/接口异常时也能展示
+    localStorage.setItem('selected_courses', JSON.stringify(selectedCourses.value))
+    localStorage.setItem('course_history', JSON.stringify(courseHistory.value))
+  } catch (e) {
+    loadLocalData()
+  } finally {
+    loading.value = false
+  }
+}
+
+onMounted(() => {
+  loadAll()
+})
 </script>
 
 <template>

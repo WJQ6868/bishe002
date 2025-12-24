@@ -4,6 +4,9 @@ import ElementPlus, { ElMessage } from 'element-plus'
 import 'element-plus/dist/index.css'
 import 'element-plus/theme-chalk/dark/css-vars.css'
 import './styles/theme.css'
+import zhCn from 'element-plus/es/locale/lang/zh-cn'
+import dayjs from 'dayjs'
+import 'dayjs/locale/zh-cn'
 import * as ElementPlusIconsVue from '@element-plus/icons-vue'
 import { vuetify } from './plugins/vuetify'
 import router from './router'
@@ -14,22 +17,25 @@ import { clearAuthState } from './utils/auth'
 
 const app = createApp(App)
 
+// 统一日期/时间与 Element Plus 组件语言为中文
+dayjs.locale('zh-cn')
+
 app.use(createPinia())
 app.use(router)
-app.use(ElementPlus)
+app.use(ElementPlus, { locale: zhCn })
 app.use(vuetify)
 
 for (const [key, component] of Object.entries(ElementPlusIconsVue)) {
-    app.component(key, component)
+  app.component(key, component)
 }
 
 // Axios 全局配置：后端基址与认证头
-axios.defaults.baseURL = 'http://localhost:8000'
+axios.defaults.baseURL = import.meta.env.VITE_API_BASE_URL || '/api'
 axios.interceptors.request.use((config) => {
   const t = localStorage.getItem('token')
   if (t) {
     config.headers = config.headers || {}
-    ;(config.headers as any)['Authorization'] = `Bearer ${t}`
+      ; (config.headers as any)['Authorization'] = `Bearer ${t}`
   }
   sendLog('info', `Request Start: ${config.method?.toUpperCase()} ${config.url}`, { params: config.params, data: config.data })
   return config

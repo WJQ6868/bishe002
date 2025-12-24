@@ -10,6 +10,7 @@ import {
   Download, DataLine, AlarmClock
 } from '@element-plus/icons-vue'
 import { marked } from 'marked'
+import { streamQA } from '@/api/ai'
 import hljs from 'highlight.js'
 import 'highlight.js/styles/github.css'
 import * as echarts from 'echarts'
@@ -361,40 +362,20 @@ const handleSend = async (content: string = inputContent.value) => {
   }
   currentSession.value.messages.push(aiMsg)
 
-  let fullResponse = ''
-  
-  // 教师端专属模拟逻辑
-  if (content.includes('教案')) {
-    fullResponse = `### Python 课程教案框架\n\n**一、教学目标**\n1. 理解 Python 基础语法\n2. 掌握变量与数据类型\n\n**二、教学重难点**\n- 重点：变量定义\n- 难点：动态类型理解\n\n**三、教学过程**\n1. 导入 (5分钟)\n2. 讲解 (20分钟)\n3. 练习 (15分钟)\n\n**四、作业布置**\n完成课后习题 1-5`
-    aiMsg.exportable = true
-  } else if (content.includes('成绩') || content.includes('分析')) {
-    fullResponse = `已分析上传的成绩表格：\n- **平均分**：82.5\n- **及格率**：93%\n- **最高分**：98 (李四)\n\n建议关注不及格学生，安排辅导。`
-    aiMsg.chartData = {
-      categories: ['60分以下', '60-70', '70-80', '80-90', '90以上'],
-      data: [3, 8, 18, 15, 6]
-    }
-  } else if (content.includes('预约') || content.includes('资源')) {
-    fullResponse = `为您找到以下可用资源：\n1. **第一计算机实验室** (周三 14:00-16:00)\n2. **多媒体教室 302** (周三 14:00-16:00)\n\n您可以点击下方按钮一键预约。`
-    aiMsg.reservationLink = '第一计算机实验室'
-  } else {
-    fullResponse = `(由 ${modelName} 生成) 收到您的问题：“${content}”。\n正在为您查找相关教学资料...`
-  }
-
-  const chars = fullResponse.split('')
-  let index = 0
-  const speed = 30
-
-  const streamInterval = setInterval(() => {
-    if (index < chars.length) {
-      aiMsg.content += chars[index]
-      index++
+  try {
+    await streamQA('teacher_ui', content, true, (t) => {
+      aiMsg.content += t
       scrollToBottom()
-    } else {
-      clearInterval(streamInterval)
-      aiMsg.isStreaming = false
-      loading.value = false
+    }, currentSession.value.model)
+    if (content.includes('教案')) {
+      aiMsg.exportable = true
     }
-  }, speed) 
+  } catch (e) {
+    ElMessage.error('AI服务不可用')
+  } finally {
+    aiMsg.isStreaming = false
+    loading.value = false
+  }
 }
 
 const toggleRecording = () => {

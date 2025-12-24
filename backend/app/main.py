@@ -70,8 +70,10 @@ app.add_middleware(
 # 创建 Socket.IO ASGI 应用（可选）
 if socketio and sio:
     socket_app = socketio.ASGIApp(sio, app)
+    print("[INFO] Socket.IO server initialized successfully - WebSocket support enabled")
 else:
     socket_app = app
+    print("[WARN] Socket.IO not available, using plain FastAPI app - WebSocket disabled")
 
 # Create tables on startup (for dev purposes)
 @app.on_event("startup")
@@ -146,3 +148,13 @@ async def root():
 @app.get("/api/health")
 async def health_check():
     return {"status": "ok"}
+
+@app.get("/api/socketio/status")
+async def socketio_status():
+    """检查 Socket.IO 服务器状态"""
+    from .services.socket_manager import online_users
+    return {
+        "socketio_enabled": socketio is not None and sio is not None,
+        "online_users_count": len(online_users) if sio else 0,
+        "message": "Socket.IO is enabled" if sio else "Socket.IO is not available"
+    }

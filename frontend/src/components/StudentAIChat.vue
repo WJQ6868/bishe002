@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, reactive, onMounted, nextTick, computed, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { streamQA } from '@/api/ai'
 import { 
   ChatRound, Plus, Delete, Edit, MoreFilled, 
   Microphone, FolderAdd, Picture, Document, 
@@ -306,7 +307,6 @@ const handleModelSwitch = (modelKey: string) => {
   scrollToBottom()
 }
 
-// 发送消息
 const handleSend = async (content: string = inputContent.value) => {
   if (!content.trim() || !currentSession.value) return
 
@@ -330,7 +330,6 @@ const handleSend = async (content: string = inputContent.value) => {
   scrollToBottom()
   loading.value = true
 
-  // 2. 模拟 AI 响应
   const aiMsgId = (Date.now() + 1).toString()
   const modelKey = currentSession.value.model
   const modelName = availableModels.value.find(m => m.model === modelKey)?.name || 'AI'
@@ -344,37 +343,17 @@ const handleSend = async (content: string = inputContent.value) => {
     modelName: modelName
   }
   currentSession.value.messages.push(aiMsg)
-
-  // 模拟响应内容
-  let fullResponse = ''
-  
-  // 简单的关键词匹配逻辑
-  if (content.includes('退课')) {
-    fullResponse = `### 退课流程说明\n\n1. 登录教务系统\n2. 进入 **选课管理** -> **我的课程**\n3. 找到对应课程，点击“退课”按钮\n\n> 注意：退课需在开学后两周内完成，逾期将无法退课。`
-  } else if (content.includes('绩点')) {
-    fullResponse = `### 绩点计算规则\n\n平均学分绩点 (GPA) 计算公式：\n\n$$ GPA = \\frac{\\sum(课程绩点 \\times 学分)}{\\sum 学分} $$\n\n**绩点对照表**：\n| 分数 | 绩点 |\n|---|---|\n| 90-100 | 4.0 |\n| 85-89 | 3.7 |\n| 82-84 | 3.3 |`
-  } else if (content.includes('代码') || content.includes('python')) {
-    fullResponse = `好的，这是一个 Python 成绩统计的示例代码：\n\n\`\`\`python\ndef calculate_average(scores):\n    if not scores:\n        return 0\n    return sum(scores) / len(scores)\n\nscores = [85, 92, 78, 90]\nprint(f"平均分: {calculate_average(scores)}")\n\`\`\``
-  } else {
-    fullResponse = `(由 ${modelName} 生成) 收到您的问题：“${content}”。\n正在为您查询相关教务规定...`
-  }
-
-  // 流式模拟
-  const chars = fullResponse.split('')
-  let index = 0
-  const speed = 30
-
-  const streamInterval = setInterval(() => {
-    if (index < chars.length) {
-      aiMsg.content += chars[index]
-      index++
+  try {
+    await streamQA('student_ui', content, true, (t) => {
+      aiMsg.content += t
       scrollToBottom()
-    } else {
-      clearInterval(streamInterval)
-      aiMsg.isStreaming = false
-      loading.value = false
-    }
-  }, speed) 
+    }, currentSession.value.model)
+  } catch (e) {
+    ElMessage.error('AI服务不可用')
+  } finally {
+    aiMsg.isStreaming = false
+    loading.value = false
+  }
 }
 
 // 语音输入

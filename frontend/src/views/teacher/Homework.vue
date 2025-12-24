@@ -85,7 +85,7 @@ const loadCourses = async () => {
 const loadHomeworks = async () => {
   loading.value = true
   try {
-    const res = await axios.get('http://localhost:8000/api/homework/list', {
+    const res = await axios.get('/homework/list', {
       headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
     })
     homeworks.value = res.data
@@ -117,7 +117,7 @@ const submitCreate = async () => {
   }
   
   try {
-    await axios.post('http://localhost:8000/api/homework/create', createForm, {
+    await axios.post('/homework/create', createForm, {
       headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
     })
     ElMessage.success('布置成功')
@@ -177,7 +177,7 @@ const submitGrade = async () => {
   if (!gradingSubmission.value) return
   
   try {
-    await axios.post('http://localhost:8000/api/homework/grade', {
+    await axios.post('/homework/grade', {
       submit_id: gradingSubmission.value.id,
       score: gradeForm.score,
       comment: gradeForm.comment,

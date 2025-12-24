@@ -19,12 +19,12 @@ const snackbarColor = ref('success')
 
 // Table Headers
 const headers = [
-  { title: '学生姓名', key: 'student_name', align: 'start', sortable: true },
+  { title: '学生姓名', key: 'student_name', align: 'start' as const, sortable: true },
   { title: '课程', key: 'course_name', sortable: true },
   { title: '请假类型', key: 'type', sortable: true },
   { title: '提交时间', key: 'created_at', sortable: true },
   { title: '状态', key: 'status', sortable: true },
-  { title: '操作', key: 'actions', sortable: false, align: 'end' },
+  { title: '操作', key: 'actions', sortable: false, align: 'end' as const },
 ]
 
 // Fetch Leaves
@@ -32,7 +32,7 @@ const fetchLeaves = async () => {
   loading.value = true
   try {
     const statusParam = activeTab.value === 0 ? 'pending' : activeTab.value === 1 ? 'approved' : undefined
-    const response = await axios.get('http://localhost:8000/api/leave/teacher/list', {
+    const response = await axios.get('/leave/teacher/list', {
       params: statusParam ? { status: statusParam } : {},
       headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
     })
@@ -60,7 +60,7 @@ const approveLeave = async (status: 'approved' | 'rejected') => {
   
   approving.value = true
   try {
-    await axios.post('http://localhost:8000/api/leave/approve', {
+    await axios.post('/leave/approve', {
       leave_id: currentLeave.value.id,
       result: status,
       opinion: approvalComment.value

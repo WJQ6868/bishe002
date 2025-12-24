@@ -185,7 +185,7 @@ const fetchLinks = async () => {
     if (currentCategory.value !== 'all') params.category = currentCategory.value
     if (searchKeyword.value) params.keyword = searchKeyword.value
 
-    const response = await axios.get('http://localhost:8000/api/cert/list', {
+    const response = await axios.get('/cert/list', {
       params,
       headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
     })
@@ -211,7 +211,7 @@ const openLink = async (link: any) => {
   window.open(link.url, '_blank')
   // Record click asynchronously
   try {
-    await axios.post(`http://localhost:8000/api/cert/click/${link.id}`)
+    await axios.post(`/cert/click/${link.id}`)
     link.click_count++
   } catch (e) {
     // Ignore error
@@ -220,7 +220,7 @@ const openLink = async (link: any) => {
 
 const toggleCollect = async (link: any) => {
   try {
-    const response = await axios.post('http://localhost:8000/api/cert/collect', 
+    const response = await axios.post('/cert/collect', 
       { link_id: link.id },
       { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } }
     )
@@ -250,7 +250,7 @@ onUnmounted(() => {
 let socket: Socket | null = null
 const initRealtime = () => {
   const host = window.location.hostname
-  socket = io(`http://${host}:8000`, { transports: ['websocket', 'polling'] })
+  socket = io('/', { transports: ['websocket', 'polling'] })
   socket.on('cert_links_updated', () => {
     fetchLinks()
   })
@@ -284,7 +284,7 @@ const openCreateDialog = () => {
 const submitCreate = async () => {
   try {
     await createFormRef.value.validate()
-    const resp = await axios.post('http://localhost:8000/api/cert/create', createForm.value, {
+    const resp = await axios.post('/cert/create', createForm.value, {
       headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
     })
     ElMessage.success('创建成功')

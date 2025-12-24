@@ -100,7 +100,7 @@ const handleLogin = async (formEl: FormInstance | undefined) => {
       loading.value = true
       
       try {
-        const response = await axios.post('http://localhost:8000/token', {
+        const response = await axios.post('/token', {
           username: form.account,
           password: form.password,
           role: form.role  // 发送选择的角色
@@ -109,7 +109,7 @@ const handleLogin = async (formEl: FormInstance | undefined) => {
         
         // Save token and fetch current user profile
         localStorage.setItem('token', access_token)
-        axios.defaults.baseURL = 'http://localhost:8000'
+        axios.defaults.baseURL = import.meta.env.VITE_API_BASE_URL || '/api'
         axios.defaults.headers.common['Authorization'] = `Bearer ${access_token}`
 
         const profileRes = await axios.get('/auth/me')

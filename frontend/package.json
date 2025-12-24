@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "vue-tsc -b && vite build",
+    "build:no-check": "vite build --mode production",
     "preview": "vite preview",
     "generate-manual": "node scripts/generate_manual.cjs"
   },

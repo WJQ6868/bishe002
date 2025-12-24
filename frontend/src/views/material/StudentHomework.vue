@@ -72,7 +72,7 @@ onMounted(() => {
 const loadHomeworks = async () => {
   loading.value = true
   try {
-    const res = await axios.get('http://localhost:8000/api/homework/list', {
+    const res = await axios.get('/homework/list', {
       headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
     })
     // 模拟数据增强
@@ -151,7 +151,7 @@ const submitHomework = async () => {
     if (submitForm.file_url && submitForm.file_url.length > 0) {
       const formData = new FormData()
       formData.append('file', submitForm.file_url[0])
-      const uploadRes = await axios.post('http://localhost:8000/api/leave/upload', formData, {
+      const uploadRes = await axios.post('/leave/upload', formData, {
         headers: { 
           'Content-Type': 'multipart/form-data',
           Authorization: `Bearer ${localStorage.getItem('token')}` 
@@ -160,7 +160,7 @@ const submitHomework = async () => {
       uploadedUrl = uploadRes.data.url
     }
 
-    await axios.post('http://localhost:8000/api/homework/submit', {
+    await axios.post('/homework/submit', {
       homework_id: currentHomework.value.id,
       content: submitForm.content,
       file_url: uploadedUrl

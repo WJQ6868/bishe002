@@ -68,11 +68,11 @@ const stats = computed(() => {
 
 // --- 表格配置 ---
 const headers = [
-  { title: '学号', key: 'student_id', align: 'start' },
-  { title: '姓名', key: 'name', align: 'start' },
-  { title: '状态', key: 'status', align: 'center' },
-  { title: '签到时间', key: 'sign_time', align: 'center' },
-  { title: '操作', key: 'actions', align: 'center', sortable: false }
+  { title: '学号', key: 'student_id', align: 'start' as const },
+  { title: '姓名', key: 'name', align: 'start' as const },
+  { title: '状态', key: 'status', align: 'center' as const },
+  { title: '签到时间', key: 'sign_time', align: 'center' as const },
+  { title: '操作', key: 'actions', align: 'center' as const, sortable: false }
 ]
 
 // --- 初始化 ---
@@ -115,7 +115,7 @@ const generateQrCode = async () => {
   if (!currentCourseId.value) return
   
   try {
-    const res = await axios.post('http://localhost:8000/api/attendance/create', {
+    const res = await axios.post('/attendance/create', {
       course_id: currentCourseId.value,
       duration: 5 // 5分钟有效期
     }, {

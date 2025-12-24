@@ -47,7 +47,7 @@ onMounted(() => {
 const loadSchedules = async () => {
   loading.value = true
   try {
-    const res = await axios.get('http://localhost:8000/api/work/schedule', {
+    const res = await axios.get('/work/schedule', {
       headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
     })
     schedules.value = res.data
@@ -89,7 +89,7 @@ const submitAdjust = async () => {
   }
   
   try {
-    await axios.post('http://localhost:8000/api/work/adjust/apply', adjustForm, {
+    await axios.post('/work/adjust/apply', adjustForm, {
       headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
     })
     ElMessage.success('申请提交成功，等待审核')

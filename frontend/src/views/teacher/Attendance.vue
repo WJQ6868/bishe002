@@ -87,7 +87,7 @@ const generateQrCode = async () => {
   if (!currentCourseId.value) return
   
   try {
-    const res = await axios.post('http://localhost:8000/api/attendance/create', {
+    const res = await axios.post('/attendance/create', {
       course_id: currentCourseId.value,
       duration: 5 // 5分钟有效期
     }, {
@@ -157,7 +157,7 @@ const fetchAttendanceRecords = async () => {
   if (!currentCourseId.value) return
   try {
     const today = new Date().toISOString().slice(0, 10)
-    const res = await axios.get('http://localhost:8000/api/attendance/list', {
+    const res = await axios.get('/attendance/list', {
       params: { course_id: currentCourseId.value, date: today },
       headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
     })

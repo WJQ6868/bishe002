@@ -19,7 +19,7 @@
               <h1>{{ service.name }}</h1>
               <div class="meta">
                 <el-tag>{{ service.category }}</el-tag>
-                <el-tag type="info">办理时长: {{ service.processing_time }}</el-tag>
+                <el-tag type="info">办理时长：{{ service.processing_time }}</el-tag>
               </div>
             </div>
           </div>
@@ -74,7 +74,7 @@
             class="apply-form"
           >
             <!-- 动态表单字段 -->
-            <template v-for="(field, index) in service.apply_fields" :key="index">
+            <template v-for="field in service.apply_fields" :key="field.name">
               <el-form-item 
                 :label="field.name" 
                 :prop="field.name"
@@ -140,7 +140,7 @@
                   class="upload-demo"
                   action="#"
                   :auto-upload="false"
-                  :on-change="(file) => handleFileChange(file, mat.name)"
+                  :on-change="getFileChangeHandler(mat.name)"
                   :limit="1"
                   :file-list="fileLists[mat.name] || []"
                 >
@@ -182,9 +182,13 @@ const formRules = reactive<Record<string, any>>({})
 const fileLists = reactive<Record<string, any[]>>({})
 const uploadedFiles = reactive<Record<string, any>>({}) // 模拟文件上传结果
 
+const getFileChangeHandler = (matName: string) => {
+  return (file: any) => handleFileChange(file, matName)
+}
+
 const fetchDetail = async () => {
   try {
-    const response = await axios.get(`http://localhost:8000/api/service/detail/${serviceId}`, {
+    const response = await axios.get(`/service/detail/${serviceId}`, {
       headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
     })
     service.value = response.data
@@ -234,7 +238,7 @@ const submitApplication = async () => {
           ...uploadedFiles[key]
         }))
 
-        await axios.post('http://localhost:8000/api/service/apply/submit', {
+        await axios.post('/service/apply/submit', {
           item_id: service.value.id,
           form_data: formData,
           materials: materials
@@ -242,14 +246,17 @@ const submitApplication = async () => {
           headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
         })
         
-        ElMessageBox.success({
-          title: '提交成功',
-          message: '您的申请已提交，请在"我的申请"中查看进度',
-          confirmButtonText: '查看进度',
-          callback: () => {
-            router.push('/service/my-applications')
+        ElMessageBox.alert(
+          '您的申请已提交，请在“我的申请”中查看进度。',
+          '提交成功',
+          {
+            type: 'success',
+            confirmButtonText: '查看进度',
+            callback: () => {
+              router.push('/service/my-applications')
+            }
           }
-        })
+        )
       } catch (error) {
         console.error('提交失败', error)
         ElMessage.error('提交失败，请重试')
@@ -293,10 +300,11 @@ onMounted(() => {
 }
 
 .panel-card {
-  background: white;
-  border-radius: 8px;
+  background: var(--el-bg-color-overlay);
+  border-radius: 12px;
   padding: 30px;
-  box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.05);
+  border: 1px solid var(--el-border-color-lighter);
+  box-shadow: var(--el-box-shadow-light);
 }
 
 .service-header {
@@ -308,19 +316,19 @@ onMounted(() => {
 .icon-box {
   width: 64px;
   height: 64px;
-  background: #ecf5ff;
+  background: var(--el-color-primary-light-9);
   border-radius: 16px;
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #409eff;
+  color: var(--el-color-primary);
   font-size: 32px;
 }
 
 .title-info h1 {
   margin: 0 0 10px;
   font-size: 24px;
-  color: #303133;
+  color: var(--el-text-color-primary);
 }
 
 .meta {
@@ -334,21 +342,22 @@ onMounted(() => {
 
 .guide-section h3 {
   font-size: 18px;
-  color: #303133;
+  color: var(--el-text-color-primary);
   margin-bottom: 15px;
-  border-left: 4px solid #409eff;
+  border-left: 4px solid var(--el-color-primary);
   padding-left: 10px;
 }
 
 .rich-text {
-  color: #606266;
+  color: var(--el-text-color-regular);
   line-height: 1.6;
 }
 
 .materials-list {
-  background: #f5f7fa;
+  background: var(--el-fill-color-light);
   padding: 15px;
-  border-radius: 4px;
+  border-radius: 12px;
+  border: 1px solid var(--el-border-color-lighter);
 }
 
 .material-item {
@@ -356,7 +365,7 @@ onMounted(() => {
   align-items: center;
   gap: 10px;
   padding: 8px 0;
-  border-bottom: 1px dashed #dcdfe6;
+  border-bottom: 1px dashed var(--el-border-color);
 }
 
 .material-item:last-child {
@@ -371,7 +380,7 @@ onMounted(() => {
 
 .materials-upload-section {
   margin-top: 20px;
-  border-top: 1px solid #ebeef5;
+  border-top: 1px solid var(--el-border-color-lighter);
   padding-top: 20px;
 }
 
@@ -386,11 +395,11 @@ onMounted(() => {
 .upload-label {
   font-size: 14px;
   margin-bottom: 5px;
-  color: #606266;
+  color: var(--el-text-color-regular);
 }
 
 .required {
-  color: #f56c6c;
+  color: var(--el-color-danger);
 }
 
 .form-actions {

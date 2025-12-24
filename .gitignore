@@ -11,6 +11,9 @@ yarn-debug.log*
 pnpm-debug.log*
 *.log
 
+# Runtime files
+*.pid
+
 # Env & editor
 .env
 .env.*
@@ -32,6 +35,10 @@ backend/logs/
 backend/.pytest_cache/
 backend/edu_system.db
 backend/test.db
+
+# Uploads
+static/uploads/
+backend/static/uploads/
 
 # Misc cache
 .pytest_cache/

@@ -143,20 +143,20 @@ const headers = computed(() => {
   if (activeTab.value === 'classroom') {
     return [
       ...baseHeaders,
-      { title: '容量', key: 'capacity', align: 'center' },
+      { title: '容量', key: 'capacity', align: 'center' as const },
       { title: '位置', key: 'location' },
       { title: '设备配置', key: 'devices', sortable: false },
-      { title: '状态', key: 'status', align: 'center' },
-      { title: '操作', key: 'actions', align: 'end', sortable: false, width: '220px' }
+      { title: '状态', key: 'status', align: 'center' as const },
+      { title: '操作', key: 'actions', align: 'end' as const, sortable: false, width: '220px' }
     ]
   } else if (activeTab.value === 'lab') {
     return [
       ...baseHeaders,
       { title: '类型', key: 'type' },
-      { title: '容纳人数', key: 'capacity', align: 'center' },
+      { title: '容纳人数', key: 'capacity', align: 'center' as const },
       { title: '负责人', key: 'manager' },
-      { title: '状态', key: 'status', align: 'center' },
-      { title: '操作', key: 'actions', align: 'end', sortable: false, width: '220px' }
+      { title: '状态', key: 'status', align: 'center' as const },
+      { title: '操作', key: 'actions', align: 'end' as const, sortable: false, width: '220px' }
     ]
   } else {
     return [
@@ -164,8 +164,8 @@ const headers = computed(() => {
       { title: '类型', key: 'type' },
       { title: '所属资源', key: 'resourceName' },
       { title: '采购时间', key: 'purchaseTime' },
-      { title: '状态', key: 'status', align: 'center' },
-      { title: '操作', key: 'actions', align: 'end', sortable: false, width: '220px' }
+      { title: '状态', key: 'status', align: 'center' as const },
+      { title: '操作', key: 'actions', align: 'end' as const, sortable: false, width: '220px' }
     ]
   }
 })
@@ -207,7 +207,7 @@ const handleRefresh = async () => {
 const fetchClassrooms = async () => {
   loading.value = true
   try {
-    const res = await axios.get('http://localhost:8000/api/classroom/list', {
+    const res = await axios.get('/classroom/list', {
       headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
     })
     classrooms.value = res.data.map((c: any) => ({

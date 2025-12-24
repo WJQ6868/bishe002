@@ -58,7 +58,7 @@ const filteredServices = computed(() => {
 
 const fetchQuickLinks = async () => {
   try {
-    const response = await axios.get('http://localhost:8000/api/quick-link/list', {
+    const response = await axios.get('/quick-link/list', {
       headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
     })
     quickLinks.value = response.data
@@ -75,7 +75,7 @@ const fetchQuickLinks = async () => {
 const fetchServices = async () => {
   loading.value = true
   try {
-    const response = await axios.get('http://localhost:8000/api/service/list', {
+    const response = await axios.get('/service/list', {
       headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
     })
     services.value = response.data

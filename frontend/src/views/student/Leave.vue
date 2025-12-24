@@ -44,6 +44,7 @@ const leaveForm = reactive({
 const courses = ref<CourseOption[]>([])
 const historyLeaves = ref<LeaveRecord[]>([])
 const loading = ref(false)
+const courseLoading = ref(false)
 const submitting = ref(false)
 
 const studentId = parseInt(localStorage.getItem('user_id') || '0')
@@ -57,8 +58,9 @@ onMounted(() => {
 
 // 加载已选课程
 const loadCourses = async () => {
+  courseLoading.value = true
   try {
-    const res = await axios.get('http://localhost:8000/api/course/student/list', {
+    const res = await axios.get('/course/student/list', {
       headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
     })
     
@@ -66,18 +68,20 @@ const loadCourses = async () => {
     const courseList = res.data
     const coursesWithTeacher = await Promise.all(courseList.map(async (c: any) => {
        try {
-           const tRes = await axios.get(`http://localhost:8000/api/course/${c.id}/teacher`, {
+           const tRes = await axios.get(`/course/${c.id}/teacher`, {
               headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
            })
            return { id: c.id, name: c.name, teacher_name: tRes.data.name }
        } catch (e) {
-           return { id: c.id, name: c.name, teacher_name: 'Unknown' }
+           return { id: c.id, name: c.name, teacher_name: '未知' }
        }
     }))
     courses.value = coursesWithTeacher
   } catch (error) {
     console.error('Failed to load courses', error)
     ElMessage.error('无法加载课程列表')
+  } finally {
+    courseLoading.value = false
   }
 }
 
@@ -86,7 +90,7 @@ const loadHistory = async () => {
   loading.value = true
   try {
     // 调用 API
-    const res = await axios.get('http://localhost:8000/api/leave/student/list', {
+    const res = await axios.get('/leave/student/list', {
       headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
     })
     historyLeaves.value = res.data.items || res.data // handle pagination wrapper or list
@@ -117,7 +121,7 @@ const submitApply = async () => {
   
   submitting.value = true
   try {
-    await axios.post('http://localhost:8000/api/leave/apply', {
+    await axios.post('/leave/apply', {
       course_id: leaveForm.course_id,
       type: leaveForm.type,
       start_time: startTime.toISOString(),
@@ -145,7 +149,7 @@ const recallApply = (id: number) => {
     type: 'warning'
   }).then(async () => {
     try {
-      await axios.post('http://localhost:8000/api/leave/recall', {
+      await axios.post('/leave/recall', {
         leave_id: id
       }, {
         headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
@@ -213,7 +217,13 @@ const formatTime = (iso: string) => {
           
           <el-form :model="leaveForm" label-width="100px" class="leave-form">
             <el-form-item label="请假课程" required>
-              <el-select v-model="leaveForm.course_id" placeholder="选择课程">
+              <el-select
+                v-model="leaveForm.course_id"
+                placeholder="选择课程"
+                filterable
+                :loading="courseLoading"
+                :no-data-text="courseLoading ? '正在加载课程…' : '暂无已选课程，请先完成选课'"
+              >
                 <el-option 
                   v-for="c in courses" 
                   :key="c.id" 
@@ -254,7 +264,7 @@ const formatTime = (iso: string) => {
             <el-form-item label="证明材料">
               <el-upload
                 class="upload-demo"
-                action="http://localhost:8000/api/leave/upload"
+                action="/api/leave/upload"
                 :headers="uploadHeaders"
                 :on-success="handleUploadSuccess"
                 :limit="1"

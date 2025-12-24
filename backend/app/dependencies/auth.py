@@ -16,15 +16,28 @@ ACCESS_TOKEN_EXPIRE_MINUTES = settings.ACCESS_TOKEN_EXPIRE_MINUTES
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 
-from passlib.context import CryptContext
+import bcrypt
+import hashlib
 
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+def _normalize_password_bytes(password: str) -> bytes:
+    password_bytes = password.encode("utf-8")
+    # bcrypt 仅处理前 72 bytes；对超长密码先做 SHA-256 预哈希以避免截断风险
+    if len(password_bytes) > 72:
+        password_bytes = hashlib.sha256(password_bytes).digest()
+    return password_bytes
 
-def verify_password(plain_password, hashed_password):
-    return pwd_context.verify(plain_password, hashed_password)
+def verify_password(plain_password: str, hashed_password: str) -> bool:
+    try:
+        return bcrypt.checkpw(
+            _normalize_password_bytes(plain_password),
+            hashed_password.encode("utf-8"),
+        )
+    except Exception:
+        return False
 
-def get_password_hash(password):
-    return pwd_context.hash(password)
+def get_password_hash(password: str) -> str:
+    hashed = bcrypt.hashpw(_normalize_password_bytes(password), bcrypt.gensalt())
+    return hashed.decode("utf-8")
 
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
     to_encode = data.copy()

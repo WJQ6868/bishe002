@@ -51,7 +51,7 @@ const links = ref<any[]>([])
 const fetchCollections = async () => {
   loading.value = true
   try {
-    const response = await axios.get('http://localhost:8000/api/cert/collection/list', {
+    const response = await axios.get('/cert/collection/list', {
       headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
     })
     links.value = response.data
@@ -78,7 +78,7 @@ const removeCollection = (link: any) => {
     }
   ).then(async () => {
     try {
-      await axios.post('http://localhost:8000/api/cert/collect', 
+      await axios.post('/cert/collect', 
         { link_id: link.id },
         { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } }
       )

@@ -141,6 +141,11 @@ const roleName = computed(() => {
 <style scoped>
 .layout-container {
   height: 100vh;
+  overflow: hidden;
+}
+
+.layout-container > .el-container {
+  height: 100%;
 }
 .el-menu-vertical {
   height: 100%;
@@ -182,5 +187,7 @@ const roleName = computed(() => {
   background-color: var(--bg-color);
   padding: 20px;
   transition: background-color 0.3s;
+  overflow: auto;
+  min-height: 0;
 }
 </style>

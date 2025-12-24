@@ -34,7 +34,7 @@ pip install -r requirements.txt
 python init_db_data.py
 
 # 3. 启动后端服务
-python -m uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+python -m uvicorn app.main:socket_app --reload --host 0.0.0.0 --port 8000
 
 # 4. 前端环境配置 (新终端)
 cd frontend

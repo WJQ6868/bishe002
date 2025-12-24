@@ -48,7 +48,7 @@ const rules = {
 // Fetch Courses
 const fetchCourses = async () => {
   try {
-    const response = await axios.get('http://localhost:8000/api/course/list', {
+    const response = await axios.get('/course/list', {
       headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
     })
     courses.value = response.data.map((c: any) => ({
@@ -80,7 +80,7 @@ const submitLeave = async () => {
       reason: reason.value,
       file_url: undefined
     }
-    await axios.post('http://localhost:8000/api/leave/apply', payload, {
+    await axios.post('/leave/apply', payload, {
       headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
     })
 

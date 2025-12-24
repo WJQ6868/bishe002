@@ -3,18 +3,23 @@ import sys
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.orm import sessionmaker, declarative_base
 
-# 兼容在无系统安装依赖的环境下运行，将本仓库的 site-packages 注入 sys.path
+# 兼容在无系统安装依赖的环境下运行：仅在“非虚拟环境”时，才将仓库内的 site-packages 注入 sys.path。
+# 在 venv 中强行注入会导致依赖混用（例如误用 backend/Lib 的旧包）。
 _base_dir = os.path.dirname(os.path.dirname(__file__))
-_paths = [
-    os.path.join(_base_dir, "venv", "Lib", "site-packages"),
-    os.path.join(_base_dir, "Lib", "site-packages"),
-]
-for _p in _paths:
-    if os.path.isdir(_p) and _p not in sys.path:
-        sys.path.insert(0, _p)
+_proj_root = os.path.dirname(_base_dir)
+_running_in_venv = sys.prefix != getattr(sys, "base_prefix", sys.prefix)
+
+if not _running_in_venv:
+    _paths = [
+        os.path.join(_proj_root, ".venv", "Lib", "site-packages"),
+        os.path.join(_base_dir, "venv", "Lib", "site-packages"),
+        os.path.join(_base_dir, "Lib", "site-packages"),
+    ]
+    for _p in _paths:
+        if os.path.isdir(_p) and _p not in sys.path:
+            sys.path.insert(0, _p)
 
 # SQLite 配置：优先使用项目根目录的 edu_system.db，其次后端目录
-_proj_root = os.path.dirname(_base_dir)
 _candidates = [
     os.path.join(_proj_root, "edu_system.db"),
     os.path.join(_base_dir, "edu_system.db"),

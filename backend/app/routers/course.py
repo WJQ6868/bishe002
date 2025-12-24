@@ -30,9 +30,13 @@ async def list_student_courses(
     if current_user.role != "student":
         raise HTTPException(status_code=403, detail="Only students can access this")
 
-    # Assuming current_user.username is the student_id in CourseSelection
-    stmt = select(Course).join(CourseSelection, Course.id == CourseSelection.course_id)\
-        .where(CourseSelection.student_id == current_user.username)
+    # 兼容历史数据：course_selections.student_id 可能存学号(username) 或 sys_users.id
+    student_keys = [str(current_user.username), str(current_user.id)]
+    stmt = (
+        select(Course)
+        .join(CourseSelection, Course.id == CourseSelection.course_id)
+        .where(CourseSelection.student_id.in_(student_keys))
+    )
     
     result = await db.execute(stmt)
     courses = result.scalars().all()

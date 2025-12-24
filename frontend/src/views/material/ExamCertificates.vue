@@ -62,7 +62,7 @@ const fetchLinks = async () => {
     if (currentCategory.value !== 'all') params.category = currentCategory.value
     if (searchKeyword.value) params.keyword = searchKeyword.value
 
-    const response = await axios.get('http://localhost:8000/api/cert/list', {
+    const response = await axios.get('/cert/list', {
       params,
       headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
     })
@@ -82,7 +82,7 @@ const fetchLinks = async () => {
 const openLink = async (link: LinkItem) => {
   window.open(link.url, '_blank')
   try {
-    await axios.post(`http://localhost:8000/api/cert/click/${link.id}`)
+    await axios.post(`/cert/click/${link.id}`)
     link.click_count++
   } catch (e) {
     // Ignore
@@ -118,7 +118,7 @@ onUnmounted(() => {
 let socket: Socket | null = null
 const initRealtime = () => {
   const host = window.location.hostname
-  socket = io(`http://${host}:8000`, { transports: ['websocket', 'polling'] })
+  socket = io('/', { transports: ['websocket', 'polling'] })
   socket.on('cert_links_updated', () => {
     fetchLinks()
   })

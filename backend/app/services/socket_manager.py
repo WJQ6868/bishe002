@@ -24,13 +24,20 @@ from sqlalchemy import select
 # 创建 Socket.IO 服务器 (异步模式)
 sio = socketio.AsyncServer(
     async_mode='asgi',
-    cors_allowed_origins=['http://localhost:2003', 'http://127.0.0.1:2003', 'http://localhost:5173'],
+    # 显式允许本地前端来源，避免 Origin 校验 403
+    cors_allowed_origins=[
+        "http://localhost:2003",
+        "http://127.0.0.1:2003",
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+    ],
     cors_credentials=True,
     logger=True,
     engineio_logger=True,
     ping_timeout=60,
-    ping_interval=25
+    ping_interval=25,
 )
+print("[Socket.IO] Server initialized with CORS: *")
 
 # 存储在线用户: {user_id: socket_id}
 online_users: Dict[int, str] = {}

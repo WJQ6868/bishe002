@@ -53,7 +53,7 @@ onMounted(() => {
 const loadLeaves = async () => {
   loading.value = true
   try {
-    const res = await axios.get('http://localhost:8000/api/leave/teacher/list', {
+    const res = await axios.get('/leave/teacher/list', {
       headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
     })
     leaves.value = res.data
@@ -112,7 +112,7 @@ const submitApprove = async () => {
   
   approving.value = true
   try {
-    await axios.post('http://localhost:8000/api/leave/approve', {
+    await axios.post('/leave/approve', {
       leave_id: currentLeave.value.id,
       result: approveForm.result,
       opinion: approveForm.opinion

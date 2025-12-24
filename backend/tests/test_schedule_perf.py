@@ -65,7 +65,7 @@ def test_schedule():
             
     except Exception as e:
         print(f"Connection failed: {e}")
-        print("Make sure the server is running: uvicorn app.main:app --reload")
+        print("Make sure the server is running: uvicorn app.main:socket_app --reload")
 
 if __name__ == "__main__":
     test_schedule()

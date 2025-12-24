@@ -19,6 +19,94 @@ from app.models.teaching import Attendance, Homework, HomeworkSubmit, ClassAdjus
 from app.dependencies.auth import get_password_hash
 from datetime import datetime, timedelta
 
+
+DEMO_STUDENT_ID = "20230001"
+
+
+async def ensure_demo_student_data(session: AsyncSession):
+    """Ensure demo student (20230001) has persistent course selections and grades.
+
+    This is intentionally idempotent so it can run on existing databases.
+    """
+    # 1) Ensure student row exists
+    result = await session.execute(select(Student).where(Student.id == DEMO_STUDENT_ID))
+    student = result.scalars().first()
+    if not student:
+        student = Student(
+            id=DEMO_STUDENT_ID,
+            name="学生20230001",
+            major="计算机科学",
+            grade="2023",
+        )
+        session.add(student)
+        await session.commit()
+    else:
+        # Keep enrollment year consistent
+        if getattr(student, "grade", None) != "2023":
+            student.grade = "2023"
+            await session.commit()
+
+    # 2) Ensure there are courses to bind
+    c_res = await session.execute(select(Course).order_by(Course.id))
+    all_courses = c_res.scalars().all()
+    if not all_courses:
+        return
+
+    # Prefer a stable subset
+    selected_courses = all_courses[:5] if len(all_courses) >= 5 else all_courses
+
+    # 3) Ensure course selections
+    sel_res = await session.execute(
+        select(CourseSelection.course_id).where(CourseSelection.student_id == DEMO_STUDENT_ID)
+    )
+    existing_course_ids = {row[0] for row in sel_res.all()}
+    for course in selected_courses:
+        if course.id in existing_course_ids:
+            continue
+        session.add(
+            CourseSelection(
+                student_id=DEMO_STUDENT_ID,
+                course_id=course.id,
+                absent_count=0,
+                submit_homework_rate=1.0,
+            )
+        )
+    await session.commit()
+
+    # 4) Ensure grades (history成绩) for a few courses
+    grade_res = await session.execute(
+        select(Grade.course_id).where(Grade.student_id == DEMO_STUDENT_ID)
+    )
+    existing_grade_course_ids = {row[0] for row in grade_res.all()}
+    grade_targets = selected_courses[:4] if len(selected_courses) >= 4 else selected_courses
+    for idx, course in enumerate(grade_targets):
+        if course.id not in existing_grade_course_ids:
+            # Make scores look realistic
+            score = [92, 85, 78, 88][idx] if idx < 4 else random.randint(70, 95)
+            session.add(
+                Grade(
+                    student_id=DEMO_STUDENT_ID,
+                    course_id=course.id,
+                    score=score,
+                    exam_type="final",
+                )
+            )
+
+        # Make semester distribution more believable for grade pages.
+        # Only adjust if create_time looks like "freshly initialized".
+        try:
+            if getattr(course, "create_time", None) and getattr(course.create_time, "year", 9999) >= 2025:
+                course.create_time = [
+                    datetime(2023, 10, 1),
+                    datetime(2024, 3, 1),
+                    datetime(2024, 10, 1),
+                    datetime(2025, 3, 1),
+                ][min(idx, 3)]
+        except Exception:
+            pass
+
+    await session.commit()
+
 # Mock Data
 MAJORS = ["计算机科学", "软件工程", "人工智能", "数据科学"]
 COURSE_NAMES = [
@@ -81,6 +169,9 @@ async def init_data():
                 await generate_classrooms_and_schedules(session, existing_teachers)
             else:
                 print("All data complete. Skipping generation.")
+
+            # Ensure demo student data even when DB already initialized.
+            await ensure_demo_student_data(session)
             return
 
         # 1. Create Teachers
@@ -219,6 +310,9 @@ async def init_data():
             students.append(student)
         await session.commit()
         print(f"Created {len(students)} students.")
+
+        # Ensure demo student exists in students table (20230001) and has data.
+        await ensure_demo_student_data(session)
 
         # 7. Create Course Selections and Grades
         selections = []

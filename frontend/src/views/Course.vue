@@ -72,7 +72,7 @@ const syncTeacherNames = () => {
 
 const fetchTeachers = async () => {
   try {
-    const res = await axios.get('http://localhost:8000/api/course/teachers', {
+    const res = await axios.get('/course/teachers', {
       headers: authHeaders()
     })
     teacherOptions.value = res.data
@@ -93,7 +93,7 @@ const fetchTeachers = async () => {
 
 const fetchCourses = async () => {
   try {
-    const res = await axios.get('http://localhost:8000/api/course/list', {
+    const res = await axios.get('/course/list', {
       headers: authHeaders()
     })
     courses.value = res.data.map((c: any) => ({
@@ -238,12 +238,12 @@ const handleSave = async () => {
   }
   try {
     if (dialogType.value === 'add') {
-      await axios.post('http://localhost:8000/api/course/add', payload, {
+      await axios.post('/course/add', payload, {
         headers: authHeaders()
       })
       ElMessage.success('添加成功')
     } else {
-      await axios.put(`http://localhost:8000/api/course/${form.id}`, payload, {
+      await axios.put(`/course/${form.id}`, payload, {
         headers: authHeaders()
       })
       ElMessage.success('修改成功')
@@ -265,7 +265,7 @@ const handleDelete = (row: Course) => {
   ElMessageBox.confirm('确定要删除该课程吗？', '提示', { type: 'warning' })
     .then(async () => {
       try {
-        await axios.delete(`http://localhost:8000/api/course/${row.id}`, {
+        await axios.delete(`/course/${row.id}`, {
           headers: authHeaders()
         })
         ElMessage.success('删除成功')
@@ -292,7 +292,7 @@ const handleBatchDelete = () => {
       try {
         await Promise.all(
           selectedRows.value.map(course =>
-            axios.delete(`http://localhost:8000/api/course/${course.id}`, {
+            axios.delete(`/course/${course.id}`, {
               headers: authHeaders()
             })
           )

@@ -16,7 +16,7 @@
         
         <div class="card-body">
           <div class="info-row">
-            <span class="label">提交时间:</span>
+            <span class="label">提交时间：</span>
             <span class="value">{{ formatTime(item.submit_time) }}</span>
           </div>
           
@@ -54,7 +54,7 @@
         <div class="section-title">申请表单</div>
         <div class="form-data-view">
           <div v-for="(value, key) in currentApply.form_data" :key="key" class="data-item">
-            <span class="key">{{ key }}:</span>
+            <span class="key">{{ key }}：</span>
             <span class="value">{{ value }}</span>
           </div>
         </div>
@@ -88,7 +88,7 @@ const currentApply = ref<any>(null)
 
 const fetchApplications = async () => {
   try {
-    const response = await axios.get('http://localhost:8000/api/service/apply/list', {
+    const response = await axios.get('/service/apply/list', {
       headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
     })
     applications.value = response.data
@@ -119,7 +119,7 @@ const getStatusLabel = (status: string) => {
     rejected: '已驳回',
     completed: '已完成'
   }
-  return map[status] || status
+  return map[status] || '未知状态'
 }
 
 const formatTime = (timeStr: string) => {
@@ -153,10 +153,30 @@ onMounted(() => {
   justify-content: space-between;
   align-items: center;
   margin-bottom: 20px;
+  background: var(--el-bg-color-overlay);
+  border: 1px solid var(--el-border-color-lighter);
+  border-radius: 12px;
+  box-shadow: var(--el-box-shadow-light);
+  padding: 16px 18px;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.page-header h2 {
+  margin: 0;
+  color: var(--el-text-color-primary);
 }
 
 .apply-card {
-  margin-bottom: 20px;
+  margin-bottom: 16px;
+  border-radius: 12px;
+  border: 1px solid var(--el-border-color-lighter);
+  transition: box-shadow 0.25s ease, transform 0.25s ease;
+}
+
+.apply-card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--el-box-shadow);
 }
 
 .card-header {
@@ -168,18 +188,20 @@ onMounted(() => {
 .service-name {
   font-weight: bold;
   font-size: 16px;
+  color: var(--el-text-color-primary);
 }
 
 .info-row {
   margin-bottom: 15px;
-  color: #606266;
+  color: var(--el-text-color-regular);
   font-size: 14px;
 }
 
 .progress-section {
-  background: #f5f7fa;
-  padding: 20px;
-  border-radius: 4px;
+  background: var(--el-fill-color-light);
+  padding: 18px;
+  border-radius: 12px;
+  border: 1px solid var(--el-border-color-lighter);
   margin-bottom: 15px;
 }
 
@@ -191,13 +213,15 @@ onMounted(() => {
   font-weight: bold;
   margin: 20px 0 10px;
   padding-left: 10px;
-  border-left: 4px solid #409eff;
+  border-left: 4px solid var(--el-color-primary);
+  color: var(--el-text-color-primary);
 }
 
 .form-data-view {
-  background: #f5f7fa;
+  background: var(--el-fill-color-light);
   padding: 15px;
-  border-radius: 4px;
+  border-radius: 12px;
+  border: 1px solid var(--el-border-color-lighter);
 }
 
 .data-item {
@@ -206,11 +230,11 @@ onMounted(() => {
 }
 
 .data-item .key {
-  color: #909399;
+  color: var(--el-text-color-secondary);
   margin-right: 10px;
 }
 
 .data-item .value {
-  color: #303133;
+  color: var(--el-text-color-primary);
 }
 </style>

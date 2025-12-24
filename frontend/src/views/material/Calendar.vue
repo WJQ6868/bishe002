@@ -91,7 +91,7 @@ const calendarDays = computed(() => {
 const fetchEvents = async () => {
   loading.value = true
   try {
-    const response = await axios.get('http://localhost:8000/api/calendar/events', {
+    const response = await axios.get('/calendar/events', {
       headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
     })
     events.value = response.data
@@ -194,10 +194,10 @@ const handleSubmit = async () => {
   try {
     const headers = { Authorization: `Bearer ${localStorage.getItem('token')}` }
     if (dialogType.value === 'add') {
-      await axios.post('http://localhost:8000/api/calendar/events', form.value, { headers })
+      await axios.post('/calendar/events', form.value, { headers })
       showSnackbar('添加成功', 'success')
     } else {
-      await axios.put(`http://localhost:8000/api/calendar/events/${form.value.id}`, form.value, { headers })
+      await axios.put(`/calendar/events/${form.value.id}`, form.value, { headers })
       showSnackbar('更新成功', 'success')
     }
     dialogVisible.value = false
@@ -218,7 +218,7 @@ const handleImport = async (files: File[]) => {
   formData.append('file', files[0])
   
   try {
-    await axios.post('http://localhost:8000/api/calendar/import', formData, {
+    await axios.post('/calendar/import', formData, {
       headers: { 
         'Content-Type': 'multipart/form-data',
         Authorization: `Bearer ${localStorage.getItem('token')}` 
@@ -266,7 +266,7 @@ onMounted(() => {
           
           <!-- 隐藏的文件输入，通过按钮触发 -->
            <v-file-input
-              label="导入 Excel"
+                label="导入表格"
               variant="outlined"
               density="compact"
               hide-details

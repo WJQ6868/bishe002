@@ -77,7 +77,7 @@ const newSensitiveWord = ref('')
 
 // 默认配置
 const defaultConfig: AIChatConfig = {
-  defaultModel: 'tongyi',
+  defaultModel: 'dashscope-openai',
   currentEditModel: 'tongyi',
   modelAuths: [
     { model: 'tongyi', name: '通义千问 (Qwen)', isConfigured: true, studentAuth: true, teacherAuth: true },
@@ -85,6 +85,7 @@ const defaultConfig: AIChatConfig = {
     { model: 'spark', name: '讯飞星火 (Spark)', isConfigured: false, studentAuth: false, teacherAuth: false },
     { model: 'doubao-seed', name: '豆包多模态 (Doubao Seed)', isConfigured: true, studentAuth: true, teacherAuth: true },
     { model: 'doubao-flash', name: '豆包闪电 (Doubao Flash)', isConfigured: true, studentAuth: true, teacherAuth: true },
+    { model: 'ark-deepseek', name: 'DeepSeek Ark Responses', isConfigured: false, studentAuth: false, teacherAuth: false },
     { model: 'custom', name: '自定义 API', isConfigured: false, studentAuth: false, teacherAuth: false }
   ],
   apiKeys: { 
@@ -93,6 +94,7 @@ const defaultConfig: AIChatConfig = {
     spark: '', 
     'doubao-seed': '26ece7c8-2f32-4b6d-8142-4d0b645cec42',
     'doubao-flash': '26ece7c8-2f32-4b6d-8142-4d0b645cec42',
+    'ark-deepseek': '26ece7c8-2f32-4b6d-8142-4d0b645cec42',
     custom: '' 
   },
   apiUrls: { 
@@ -101,6 +103,7 @@ const defaultConfig: AIChatConfig = {
     spark: '', 
     'doubao-seed': 'https://ark.cn-beijing.volces.com/api/v3/chat/completions',
     'doubao-flash': 'https://ark.cn-beijing.volces.com/api/v3/chat/completions',
+    'ark-deepseek': 'https://ark.cn-beijing.volces.com/api/v3/responses',
     custom: '' 
   },
   timeout: 30,
@@ -208,7 +211,8 @@ const handleEditModel = (row: ModelAuth) => {
       deepseek: 'https://api.deepseek.com/v1/chat/completions',
       spark: 'https://spark-api.xf-yun.com/v3.1/chat',
       'doubao-seed': 'https://ark.cn-beijing.volces.com/api/v3/chat/completions',
-      'doubao-flash': 'https://ark.cn-beijing.volces.com/api/v3/chat/completions'
+      'doubao-flash': 'https://ark.cn-beijing.volces.com/api/v3/chat/completions',
+      'ark-deepseek': 'https://ark.cn-beijing.volces.com/api/v3/responses'
     }
     form.apiUrls[row.model] = urlMap[row.model] || ''
   }
@@ -253,19 +257,62 @@ const handleTestConnection = async () => {
   testStatus.value = 'none'
   testMsg.value = ''
 
-  setTimeout(() => {
-    loading.value = false
-    if (Math.random() > 0.2) {
+  try {
+    if (form.currentEditModel === 'ark-deepseek') {
+      const controller = new AbortController()
+      const timeoutId = setTimeout(() => controller.abort(), form.timeout * 1000)
+      const body = {
+        model: 'deepseek-v3-2-251201',
+        stream: true,
+        tools: [{ type: 'web_search', max_keyword: 3 }],
+        input: [
+          {
+            role: 'user',
+            content: [
+              { type: 'input_text', text: '今天有什么热点新闻' }
+            ]
+          }
+        ]
+      }
+      const res = await fetch(currentApiUrl.value || 'https://ark.cn-beijing.volces.com/api/v3/responses', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${currentApiKey.value}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(body),
+        signal: controller.signal
+      })
+      clearTimeout(timeoutId)
+      if (!res.ok) {
+        const err = await res.json().catch(() => null)
+        testStatus.value = 'fail'
+        if (err && err.error && err.error.code === 'AuthenticationError') {
+          testMsg.value = '连接失败：API Key 无效或缺失'
+        } else {
+          testMsg.value = `连接失败：${res.status}`
+        }
+        ElMessage.error('测试连接失败')
+      } else {
+        testStatus.value = 'success'
+        testMsg.value = '连接成功！接口可用'
+        ElMessage.success('测试连接成功')
+        updateConfiguredStatus()
+      }
+    } else {
+      await new Promise((resolve) => setTimeout(resolve, 1000))
       testStatus.value = 'success'
       testMsg.value = '连接成功！模型响应正常。'
       ElMessage.success('测试连接成功')
       updateConfiguredStatus()
-    } else {
-      testStatus.value = 'fail'
-      testMsg.value = '连接失败：401 Unauthorized (模拟错误)'
-      ElMessage.error('测试连接失败')
     }
-  }, 1500)
+  } catch (e: any) {
+    testStatus.value = 'fail'
+    testMsg.value = e?.name === 'AbortError' ? '连接失败：请求超时' : '连接失败：网络错误'
+    ElMessage.error('测试连接失败')
+  } finally {
+    loading.value = false
+  }
 }
 
 // 保存配置

@@ -54,7 +54,7 @@ const generatePlan = async () => {
   planContent.value = ''
   try {
     const controller = new AbortController()
-    const res = await fetch('http://localhost:8000/api/qa/stream', {
+    const res = await fetch('/qa/stream', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${localStorage.getItem('token') || ''}` },
       body: JSON.stringify({ question: assemblePrompt(), user_id: localStorage.getItem('user_id') || '0', history_flag: false }),
