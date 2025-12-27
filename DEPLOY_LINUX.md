@@ -26,6 +26,24 @@ sudo ./deploy_linux.sh --domain <你的域名或IP>
 - 生成并启动 systemd 服务：`edu-system-backend.service`
 - 写入并加载 Nginx 配置：`/etc/nginx/conf.d/edu-system.conf`
 
+## 1.5 更新代码（git 拉取最新）
+
+如果你的服务器上已存在仓库目录（例如你图里是：`/root/one-liunx/bishe002`），可以使用仓库根目录自带脚本一键拉取最新代码：
+
+```bash
+chmod +x pull_github_updates.sh
+./pull_github_updates.sh --dir /root/one-liunx/bishe002
+```
+
+说明：
+
+- 默认“安全模式”：检测到本地改动会退出，避免误覆盖。
+- 如需强制与远程一致（会覆盖本地改动）：
+
+```bash
+./pull_github_updates.sh --dir /root/one-liunx/bishe002 --force
+```
+
 ## 2. 验证
 
 ```bash
