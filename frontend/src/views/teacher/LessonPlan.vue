@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import { ElMessage } from 'element-plus'
 
 const creating = ref(false)
@@ -10,8 +10,15 @@ const syllabus = ref('')
 const modelList = ref<string[]>([])
 const selectedModel = ref('')
 const dialogVisible = ref(false)
+const featureEnabled = ref(true)
+const rateLimit = ref(0)
+const templateName = ref('通用教学模板')
 
 const openCreate = () => {
+  if (!featureEnabled.value) {
+    ElMessage.warning('智能教案已被管理员关闭')
+    return
+  }
   creating.value = true
 }
 const savePlan = () => {
@@ -24,8 +31,22 @@ const savePlan = () => {
 }
 const loadModels = () => {
   try {
-    const saved = localStorage.getItem('ai_models')
-    const arr = saved ? JSON.parse(saved) : null
+    const saved = localStorage.getItem('ai_feature_configs')
+    if (saved) {
+      const parsed = JSON.parse(saved)
+      const feature = parsed.features?.lesson
+      featureEnabled.value = feature?.enabled ?? true
+      rateLimit.value = feature?.rateLimit ?? 0
+      templateName.value = feature?.rules?.template || '通用教学模板'
+      const apis = parsed.apis || []
+      const list = apis.filter((a: any) => a.feature === 'lesson').map((a: any) => a.model || a.name)
+      const base = list.length ? list : ['Qwen-Max','Qwen-Plus','Qwen-Turbo']
+      modelList.value = base
+      selectedModel.value = base[0]
+      return
+    }
+    const savedModels = localStorage.getItem('ai_models')
+    const arr = savedModels ? JSON.parse(savedModels) : null
     const base = Array.isArray(arr) && arr.length ? arr : ['Qwen-Max','Qwen-Plus','Qwen-Turbo']
     modelList.value = base
     selectedModel.value = base[0]
@@ -35,6 +56,8 @@ const loadModels = () => {
   }
 }
 loadModels()
+
+const statusLabel = computed(() => featureEnabled.value ? '可用' : '已关闭')
 
 const assemblePrompt = () => {
   const title = planTitle.value.trim() || '未命名课程教案'
@@ -86,9 +109,9 @@ const generatePlan = async () => {
       </div>
     </div>
 
-    <el-alert type="info" show-icon title="说明">
+    <el-alert type="info" show-icon :title="`状态：${statusLabel}`">
       <template #default>
-        <div>本页面为智能教案入口。可在右下角 AI 助手中生成教案草案并粘贴到此处保存。</div>
+        <div>模板：{{ templateName }}；频次上限：{{ rateLimit || '未设置' }} / 教师；功能由管理员端控制。</div>
       </template>
     </el-alert>
 

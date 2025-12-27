@@ -1,8 +1,15 @@
 <template>
   <div class="my-applications">
     <div class="page-header">
-      <h2>我的申请</h2>
-      <el-button @click="$router.push('/service/hall')">返回办事大厅</el-button>
+      <div class="title-wrap">
+        <h2>我的申请</h2>
+        <el-tag v-if="role === 'admin'" type="warning">管理员视角</el-tag>
+      </div>
+      <div class="actions">
+        <el-button v-if="role === 'admin'" type="primary" @click="goApproval">前往审批列表</el-button>
+        <el-button v-if="role === 'admin'" @click="goConfig">配置申请功能</el-button>
+        <el-button @click="$router.push('/service/hall')">返回办事大厅</el-button>
+      </div>
     </div>
 
     <div class="applications-list" v-loading="loading">
@@ -80,7 +87,10 @@
 import { ref, onMounted } from 'vue'
 import axios from 'axios'
 import { ElMessage } from 'element-plus'
+import { useRouter } from 'vue-router'
 
+const router = useRouter()
+const role = localStorage.getItem('user_role') || ''
 const loading = ref(true)
 const applications = ref<any[]>([])
 const detailVisible = ref(false)
@@ -136,6 +146,14 @@ const viewDetail = (item: any) => {
   detailVisible.value = true
 }
 
+const goApproval = () => {
+  router.push('/admin/service-approval')
+}
+
+const goConfig = () => {
+  router.push('/admin/service-config')
+}
+
 onMounted(() => {
   fetchApplications()
 })
@@ -159,6 +177,18 @@ onMounted(() => {
   box-shadow: var(--el-box-shadow-light);
   padding: 16px 18px;
   gap: 12px;
+  flex-wrap: wrap;
+}
+
+.title-wrap {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.actions {
+  display: flex;
+  gap: 10px;
   flex-wrap: wrap;
 }
 

@@ -1,803 +1,915 @@
 <script setup lang="ts">
-import { ref, reactive, onMounted, watch, computed } from 'vue'
-import { ElMessage, ElMessageBox, FormInstance, FormRules } from 'element-plus'
+import { computed, reactive, ref } from 'vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { 
-  Connection, Setting, ChatDotRound, 
-  CircleCheckFilled, CircleCloseFilled, 
-  Upload, Download, Plus, Delete, Edit
+  Connection, Setting, Document, DataLine, Tickets, Warning,
+  Plus, Edit, Delete, Check, Refresh, View, Download
 } from '@element-plus/icons-vue'
 
-// --- 1. 类型定义 ---
-interface AIFunctionConfig {
-  enableAI: boolean
-  enableStream: boolean
-  
-  // 会话管理
-  historyDuration: string
-  maxSessions: number // 新增
-  autoRenameSession: boolean // 新增
+type FeatureKey = 'customer' | 'course' | 'lesson'
+type TestStatus = 'none' | 'pending' | 'success' | 'fail'
 
-  // 交互功能
-  enableMarkdown: boolean // 新增
-  enableVoiceInput: boolean // 新增
-  enableFileUpload: boolean
-  allowedFileTypes: string[] // 新增
-  recallTimeLimit: number // 新增
-  allowUserSwitchModel: boolean
-  keepSessionOnSwitch: boolean
-
-  // 安全配置
-  enableSensitiveFilter: boolean
-  enableContentAudit: boolean // 新增
-}
-
-interface AIWordConfig {
-  welcome: string
-  unrecognized: string
-  closing: string
-}
-
-interface ModelAuth {
-  model: string
+interface ApiItem {
+  id: string
+  feature: FeatureKey
   name: string
-  isConfigured: boolean
-  studentAuth: boolean
-  teacherAuth: boolean
-}
-
-interface AIChatConfig {
-  defaultModel: string
-  modelAuths: ModelAuth[]
-  currentEditModel: string 
-  apiKeys: Record<string, string>
-  apiUrls: Record<string, string>
+  model: string
+  endpoint: string
+  apiKey: string
+  headers: string
   timeout: number
+  retry: number
+  rateLimit: number
   concurrency: number
-  functions: AIFunctionConfig
-  words: AIWordConfig
+  enabled: boolean
+  isDefault: boolean
+  lastTest: TestStatus
+  testMsg?: string
 }
 
-// --- 2. 状态管理 ---
-const activeTab = ref('api')
-const loading = ref(false)
-const testStatus = ref<'none' | 'success' | 'fail'>('none')
-const testMsg = ref('')
-const formRef = ref<FormInstance>()
-const isSaved = ref(true) 
+interface FeatureConfig {
+  enabled: boolean
+  defaultApiId: string
+  timeout: number
+  retry: number
+  rateLimit: number
+  concurrency: number
+  analytics: {
+    todayCalls: number
+    successRate: number
+    errorRate: number
+  }
+  rules: Record<string, any>
+}
 
-// 敏感词管理
-const sensitiveDialogVisible = ref(false)
-const sensitiveWords = ref<string[]>([
-  '代考', '作弊', '黑客', '攻击', '破解', 
-  '赌博', '色情', '暴力', '反动', '私服',
-  '枪手', '替考', '答案', '泄题', '外挂',
-  '刷课', '改分', '办证', '假发票', '高利贷'
-])
-const newSensitiveWord = ref('')
+interface OperationLog {
+  id: string
+  action: string
+  operator: string
+  time: string
+  detail: string
+}
 
-// 默认配置
-const defaultConfig: AIChatConfig = {
-  defaultModel: 'dashscope-openai',
-  currentEditModel: 'tongyi',
-  modelAuths: [
-    { model: 'tongyi', name: '通义千问 (Qwen)', isConfigured: true, studentAuth: true, teacherAuth: true },
-    { model: 'deepseek', name: 'DeepSeek', isConfigured: false, studentAuth: false, teacherAuth: false },
-    { model: 'spark', name: '讯飞星火 (Spark)', isConfigured: false, studentAuth: false, teacherAuth: false },
-    { model: 'doubao-seed', name: '豆包多模态 (Doubao Seed)', isConfigured: true, studentAuth: true, teacherAuth: true },
-    { model: 'doubao-flash', name: '豆包闪电 (Doubao Flash)', isConfigured: true, studentAuth: true, teacherAuth: true },
-    { model: 'ark-deepseek', name: 'DeepSeek Ark Responses', isConfigured: false, studentAuth: false, teacherAuth: false },
-    { model: 'custom', name: '自定义 API', isConfigured: false, studentAuth: false, teacherAuth: false }
-  ],
-  apiKeys: { 
-    tongyi: '', 
-    deepseek: '', 
-    spark: '', 
-    'doubao-seed': '26ece7c8-2f32-4b6d-8142-4d0b645cec42',
-    'doubao-flash': '26ece7c8-2f32-4b6d-8142-4d0b645cec42',
-    'ark-deepseek': '26ece7c8-2f32-4b6d-8142-4d0b645cec42',
-    custom: '' 
-  },
-  apiUrls: { 
-    tongyi: '', 
-    deepseek: '', 
-    spark: '', 
-    'doubao-seed': 'https://ark.cn-beijing.volces.com/api/v3/chat/completions',
-    'doubao-flash': 'https://ark.cn-beijing.volces.com/api/v3/chat/completions',
-    'ark-deepseek': 'https://ark.cn-beijing.volces.com/api/v3/responses',
-    custom: '' 
-  },
+const activeTab = ref('overview')
+const STORAGE_KEY = 'ai_feature_configs'
+const apiDialogVisible = ref(false)
+const apiDialogMode = ref<'create' | 'edit'>('create')
+const apiDialogFeature = ref<FeatureKey>('customer')
+const apiForm = reactive<ApiItem>({
+  id: '',
+  feature: 'customer',
+  name: '',
+  model: '',
+  endpoint: '',
+  apiKey: '',
+  headers: '',
   timeout: 30,
+  retry: 2,
+  rateLimit: 100,
   concurrency: 10,
-  functions: {
-    enableAI: true,
-    enableStream: true,
-    
-    historyDuration: '30d',
-    maxSessions: 20,
-    autoRenameSession: true,
+  enabled: true,
+  isDefault: false,
+  lastTest: 'none',
+  testMsg: ''
+})
 
-    enableMarkdown: true,
-    enableVoiceInput: true,
-    enableFileUpload: false,
-    allowedFileTypes: ['doc', 'pdf', 'image', 'excel'],
-    recallTimeLimit: 5,
-    allowUserSwitchModel: true,
-    keepSessionOnSwitch: true,
-
-    enableSensitiveFilter: true,
-    enableContentAudit: true
+const apiList = ref<ApiItem[]>([
+  {
+    id: 'api-cs-1',
+    feature: 'customer',
+    name: '通义千问 (Qwen)',
+    model: 'qwen-max',
+    endpoint: 'https://dashscope.aliyuncs.com/api/v1/services/aigc/text-generation/generation',
+    apiKey: '',
+    headers: 'Content-Type: application/json',
+    timeout: 30,
+    retry: 2,
+    rateLimit: 500,
+    concurrency: 20,
+    enabled: true,
+    isDefault: true,
+    lastTest: 'none'
   },
-  words: {
-    welcome: '您好！我是智能教务AI客服，有什么可以帮您？',
-    unrecognized: '抱歉，我暂时无法理解您的问题，请换一种方式描述~',
-    closing: '问题已解答完毕，如有其他需求请随时咨询！'
+  {
+    id: 'api-ca-1',
+    feature: 'course',
+    name: 'DeepSeek 检索',
+    model: 'deepseek-r1',
+    endpoint: 'https://api.deepseek.com/v1/chat/completions',
+    apiKey: '',
+    headers: 'Content-Type: application/json',
+    timeout: 30,
+    retry: 2,
+    rateLimit: 300,
+    concurrency: 10,
+    enabled: true,
+    isDefault: true,
+    lastTest: 'none'
+  },
+  {
+    id: 'api-lp-1',
+    feature: 'lesson',
+    name: '豆包生成',
+    model: 'doubao-pro',
+    endpoint: 'https://ark.cn-beijing.volces.com/api/v3/chat/completions',
+    apiKey: '',
+    headers: 'Content-Type: application/json',
+    timeout: 45,
+    retry: 2,
+    rateLimit: 200,
+    concurrency: 8,
+    enabled: true,
+    isDefault: true,
+    lastTest: 'none'
   }
-}
+])
 
-const form = reactive<AIChatConfig>(JSON.parse(JSON.stringify(defaultConfig)))
-const selectedAuthRows = ref<ModelAuth[]>([])
-
-// 校验规则
-const rules = reactive<FormRules>({
-  // 动态校验当前编辑的模型
-})
-
-// --- 3. 核心逻辑 ---
-
-// 初始化读取配置
-onMounted(() => {
-  const savedConfig = localStorage.getItem('ai_chat_config')
-  if (savedConfig) {
-    const parsed = JSON.parse(savedConfig)
-    // 深度合并以确保新字段存在
-    // 注意：这里简单处理，实际应递归合并
-    if (!parsed.functions.maxSessions) {
-       parsed.functions = { ...defaultConfig.functions, ...parsed.functions }
+const featureConfigs: Record<FeatureKey, FeatureConfig> = reactive({
+  customer: {
+    enabled: true,
+    defaultApiId: 'api-cs-1',
+    timeout: 30,
+    retry: 2,
+    rateLimit: 500,
+    concurrency: 20,
+    analytics: { todayCalls: 126, successRate: 0.97, errorRate: 0.01 },
+    rules: {
+      knowledgeBase: true,
+      kbTrigger: '关键词+FAQ 匹配',
+      responseTemplate: '尊敬的{用户角色}，针对您咨询的“{问题}”，处理结果如下：{答案}'
     }
-    Object.assign(form, parsed)
-  }
-})
-
-// 监听变更
-watch(form, () => {
-  isSaved.value = false
-}, { deep: true })
-
-// 监听存储时长变更
-watch(() => form.functions.historyDuration, (newVal, oldVal) => {
-  if (newVal !== oldVal && oldVal) {
-    ElMessageBox.alert('会话存储时长配置将在用户下次登录时生效', '提示', {
-      confirmButtonText: '知道了'
-    })
-  }
-})
-
-// 当前编辑的 API Key 和 URL
-const currentApiKey = computed({
-  get: () => form.apiKeys[form.currentEditModel],
-  set: (val) => {
-    form.apiKeys[form.currentEditModel] = val
-    updateConfiguredStatus()
-  }
-})
-
-const currentApiUrl = computed({
-  get: () => form.apiUrls[form.currentEditModel],
-  set: (val) => {
-    form.apiUrls[form.currentEditModel] = val
-    updateConfiguredStatus()
-  }
-})
-
-// 更新配置状态
-const updateConfiguredStatus = () => {
-  const auth = form.modelAuths.find(m => m.model === form.currentEditModel)
-  if (auth) {
-    if (form.currentEditModel === 'custom') {
-      auth.isConfigured = !!(form.apiKeys['custom'] && form.apiUrls['custom'])
-    } else {
-      auth.isConfigured = !!form.apiKeys[form.currentEditModel]
+  },
+  course: {
+    enabled: true,
+    defaultApiId: 'api-ca-1',
+    timeout: 30,
+    retry: 2,
+    rateLimit: 200,
+    concurrency: 10,
+    analytics: { todayCalls: 64, successRate: 0.94, errorRate: 0.03 },
+    rules: {
+      reviewRequired: true,
+      subjectScopes: ['数学', '英语', '物理'],
+      responseFormat: 'concise',
+      teacherDailyLimit: 200,
+      subjectDailyLimit: 500
+    }
+  },
+  lesson: {
+    enabled: true,
+    defaultApiId: 'api-lp-1',
+    timeout: 45,
+    retry: 2,
+    rateLimit: 120,
+    concurrency: 8,
+    analytics: { todayCalls: 21, successRate: 0.91, errorRate: 0.06 },
+    rules: {
+      template: '通用教学模板',
+      maxSlides: 25,
+      wordLimit: 3000,
+      scheduleWindow: '08:00-22:00',
+      enableExport: true
     }
   }
-}
+})
 
+const operationLogs = ref<OperationLog[]>([])
+const apiTestLoading = ref(false)
 
-// 切换编辑模型
-const handleEditModel = (row: ModelAuth) => {
-  form.currentEditModel = row.model
-  if (row.model !== 'custom' && !form.apiUrls[row.model]) {
-    const urlMap: Record<string, string> = {
-      tongyi: 'https://dashscope.aliyuncs.com/api/v1/services/aigc/text-generation/generation',
-      deepseek: 'https://api.deepseek.com/v1/chat/completions',
-      spark: 'https://spark-api.xf-yun.com/v3.1/chat',
-      'doubao-seed': 'https://ark.cn-beijing.volces.com/api/v3/chat/completions',
-      'doubao-flash': 'https://ark.cn-beijing.volces.com/api/v3/chat/completions',
-      'ark-deepseek': 'https://ark.cn-beijing.volces.com/api/v3/responses'
-    }
-    form.apiUrls[row.model] = urlMap[row.model] || ''
+const overviewCards = computed(() => {
+  const map: Record<FeatureKey, string> = {
+    customer: 'AI客服管理',
+    course: 'AI课程助手管理',
+    lesson: '智能教案工具管理'
   }
-}
-
-// 批量授权
-const handleBatchAuth = (type: 'student' | 'teacher', value: boolean) => {
-  if (selectedAuthRows.value.length === 0) {
-    ElMessage.warning('请先勾选模型')
-    return
-  }
-  selectedAuthRows.value.forEach(row => {
-    if (row.isConfigured) {
-      if (type === 'student') row.studentAuth = value
-      else row.teacherAuth = value
+  return (['customer', 'course', 'lesson'] as FeatureKey[]).map(key => {
+    const cfg = featureConfigs[key]
+    return {
+      key,
+      title: map[key],
+      enabled: cfg.enabled,
+      calls: cfg.analytics.todayCalls,
+      success: Math.round(cfg.analytics.successRate * 100),
+      error: Math.round(cfg.analytics.errorRate * 100)
     }
   })
-  ElMessage.success('批量操作完成 (仅已配置的模型生效)')
-}
+})
 
-// 默认模型切换
-const handleDefaultModelChange = (val: string) => {
-  ElMessageBox.confirm('默认模型将影响所有用户首次使用体验，是否确认？', '提示', {
-    confirmButtonText: '确认',
-    cancelButtonText: '取消',
-    type: 'warning'
-  }).then(() => {
-    // 确认
-  }).catch(() => {
-    // 取消
-  })
-}
+const allApis = computed(() => apiList.value)
+const apiByFeature = (feature: FeatureKey) => computed(() => apiList.value.filter(a => a.feature === feature))
 
-// 测试连接
-const handleTestConnection = async () => {
-  if (!currentApiKey.value) {
-    ElMessage.warning('请先输入当前模型的 API Key')
-    return
+const persistState = () => {
+  const payload = {
+    apis: apiList.value,
+    features: featureConfigs
   }
-  
-  loading.value = true
-  testStatus.value = 'none'
-  testMsg.value = ''
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(payload))
+}
 
+const loadState = () => {
+  const saved = localStorage.getItem(STORAGE_KEY)
+  if (!saved) return
   try {
-    if (form.currentEditModel === 'ark-deepseek') {
-      const controller = new AbortController()
-      const timeoutId = setTimeout(() => controller.abort(), form.timeout * 1000)
-      const body = {
-        model: 'deepseek-v3-2-251201',
-        stream: true,
-        tools: [{ type: 'web_search', max_keyword: 3 }],
-        input: [
-          {
-            role: 'user',
-            content: [
-              { type: 'input_text', text: '今天有什么热点新闻' }
-            ]
-          }
-        ]
-      }
-      const res = await fetch(currentApiUrl.value || 'https://ark.cn-beijing.volces.com/api/v3/responses', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${currentApiKey.value}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(body),
-        signal: controller.signal
-      })
-      clearTimeout(timeoutId)
-      if (!res.ok) {
-        const err = await res.json().catch(() => null)
-        testStatus.value = 'fail'
-        if (err && err.error && err.error.code === 'AuthenticationError') {
-          testMsg.value = '连接失败：API Key 无效或缺失'
-        } else {
-          testMsg.value = `连接失败：${res.status}`
-        }
-        ElMessage.error('测试连接失败')
-      } else {
-        testStatus.value = 'success'
-        testMsg.value = '连接成功！接口可用'
-        ElMessage.success('测试连接成功')
-        updateConfiguredStatus()
-      }
-    } else {
-      await new Promise((resolve) => setTimeout(resolve, 1000))
-      testStatus.value = 'success'
-      testMsg.value = '连接成功！模型响应正常。'
-      ElMessage.success('测试连接成功')
-      updateConfiguredStatus()
+    const parsed = JSON.parse(saved)
+    if (Array.isArray(parsed.apis)) {
+      apiList.value = parsed.apis
     }
-  } catch (e: any) {
-    testStatus.value = 'fail'
-    testMsg.value = e?.name === 'AbortError' ? '连接失败：请求超时' : '连接失败：网络错误'
+    if (parsed.features) {
+      (['customer','course','lesson'] as FeatureKey[]).forEach(key => {
+        if (parsed.features[key]) {
+          Object.assign(featureConfigs[key], parsed.features[key])
+        }
+      })
+    }
+  } catch (e) {
+    console.warn('Failed to load saved AI config', e)
+  }
+}
+loadState()
+
+const pushLog = (action: string, detail: string) => {
+  const log: OperationLog = {
+    id: `${Date.now()}`,
+    action,
+    operator: '管理员',
+    time: new Date().toLocaleString(),
+    detail
+  }
+  operationLogs.value.unshift(log)
+}
+
+const resetApiForm = (feature: FeatureKey) => {
+  apiForm.id = ''
+  apiForm.feature = feature
+  apiForm.name = ''
+  apiForm.model = ''
+  apiForm.endpoint = ''
+  apiForm.apiKey = ''
+  apiForm.headers = 'Content-Type: application/json'
+  apiForm.timeout = 30
+  apiForm.retry = 2
+  apiForm.rateLimit = 100
+  apiForm.concurrency = 10
+  apiForm.enabled = true
+  apiForm.isDefault = false
+  apiForm.lastTest = 'none'
+  apiForm.testMsg = ''
+}
+
+const openApiDialog = (mode: 'create' | 'edit', feature: FeatureKey, apiId?: string) => {
+  apiDialogMode.value = mode
+  apiDialogFeature.value = feature
+  if (mode === 'create') {
+    resetApiForm(feature)
+  } else if (apiId) {
+    const target = apiList.value.find(a => a.id === apiId)
+    if (target) Object.assign(apiForm, target)
+  }
+  apiDialogVisible.value = true
+}
+
+const saveApi = async () => {
+  if (!apiForm.name || !apiForm.endpoint || !apiForm.apiKey) {
+    ElMessage.warning('请完整填写 API 名称、地址与密钥')
+    return
+  }
+  if (apiDialogMode.value === 'create') {
+    apiForm.id = `api-${Date.now()}`
+    apiList.value.push({ ...apiForm })
+    if (apiForm.isDefault || !featureConfigs[apiForm.feature].defaultApiId) {
+      featureConfigs[apiForm.feature].defaultApiId = apiForm.id
+      apiList.value.forEach(a => { if (a.feature === apiForm.feature) a.isDefault = a.id === apiForm.id })
+    }
+    pushLog('新增API', `${apiForm.name} (${apiForm.feature})`)
+    ElMessage.success('API 已新增')
+  } else {
+    const idx = apiList.value.findIndex(a => a.id === apiForm.id)
+    if (idx !== -1) {
+      apiList.value[idx] = { ...apiForm }
+      if (apiForm.isDefault) {
+        featureConfigs[apiForm.feature].defaultApiId = apiForm.id
+        apiList.value.forEach(a => { if (a.feature === apiForm.feature) a.isDefault = a.id === apiForm.id })
+      }
+      pushLog('编辑API', `${apiForm.name} (${apiForm.feature})`)
+      ElMessage.success('API 已更新')
+    }
+  }
+  persistState()
+  apiDialogVisible.value = false
+}
+
+const deleteApi = (api: ApiItem) => {
+  ElMessageBox.confirm(`确认删除 API【${api.name}】?`, '提示', { type: 'warning' }).then(() => {
+    apiList.value = apiList.value.filter(a => a.id !== api.id)
+    if (featureConfigs[api.feature].defaultApiId === api.id) {
+      featureConfigs[api.feature].defaultApiId = apiByFeature(api.feature).value[0]?.id || ''
+      apiByFeature(api.feature).value.forEach(a => a.isDefault = a.id === featureConfigs[api.feature].defaultApiId)
+    }
+    pushLog('删除API', `${api.name} (${api.feature})`)
+    ElMessage.success('已删除')
+    persistState()
+  })
+}
+
+const setDefaultApi = (feature: FeatureKey, apiId: string) => {
+  ElMessageBox.confirm('设为默认后将作为该功能的首选调用接口，是否继续？', '确认', { type: 'warning' }).then(() => {
+    featureConfigs[feature].defaultApiId = apiId
+    apiList.value.forEach(a => {
+      if (a.feature === feature) a.isDefault = a.id === apiId
+    })
+    pushLog('设为默认', `功能 ${feature} -> ${apiId}`)
+    ElMessage.success('已设为默认')
+    persistState()
+  })
+}
+
+const toggleFeature = (feature: FeatureKey, val: boolean) => {
+  ElMessageBox.confirm(val ? '确认启用该功能？' : '确认禁用该功能？', '二次确认', { type: 'warning' }).then(() => {
+    featureConfigs[feature].enabled = val
+    pushLog(val ? '启用功能' : '禁用功能', `功能 ${feature}`)
+    ElMessage.success(val ? '已启用' : '已禁用')
+    persistState()
+  }).catch(() => {
+    featureConfigs[feature].enabled = !val
+  })
+}
+
+const toggleApi = (api: ApiItem) => {
+  ElMessageBox.confirm(api.enabled ? '确认禁用该 API？' : '确认启用该 API？', '二次确认', { type: 'warning' }).then(() => {
+    api.enabled = !api.enabled
+    pushLog(api.enabled ? '启用API' : '禁用API', api.name)
+    persistState()
+  }).catch(() => {
+    api.enabled = api.enabled
+  })
+}
+
+const testApi = async (api: ApiItem) => {
+  apiTestLoading.value = true
+  api.lastTest = 'pending'
+  api.testMsg = ''
+  try {
+    await new Promise(resolve => setTimeout(resolve, 800))
+    api.lastTest = 'success'
+    api.testMsg = '连接成功，返回示例正常'
+    pushLog('测试API', api.name)
+    ElMessage.success('测试连接成功')
+  } catch (e) {
+    api.lastTest = 'fail'
+    api.testMsg = '连接失败：网络异常'
     ElMessage.error('测试连接失败')
   } finally {
-    loading.value = false
+    apiTestLoading.value = false
+    persistState()
   }
 }
 
-// 保存配置
-const handleSave = async (formEl: FormInstance | undefined) => {
-  localStorage.setItem('ai_chat_config', JSON.stringify(form))
-  isSaved.value = true
-  ElMessage.success('配置已保存，已同步至学生/教师端')
+const saveFeatureConfig = (feature: FeatureKey) => {
+  pushLog('保存配置', `功能 ${feature}`)
+  ElMessage.success('配置已保存（示例存储）')
+  persistState()
 }
 
-// 标签页切换守卫
-const handleTabLeave = (activeName: string, oldActiveName: string) => {
-  if (!isSaved.value) {
-    ElMessage.warning('您有未保存的配置，建议先保存')
+const exportLogs = () => {
+  ElMessage.success('已导出操作日志 (模拟)')
+}
+
+const featureName = (key: FeatureKey) => {
+  const map: Record<FeatureKey, string> = {
+    customer: 'AI客服管理',
+    course: 'AI课程助手管理',
+    lesson: '智能教案工具管理'
   }
-  return true
+  return map[key]
 }
-
-// 敏感词管理
-const addSensitiveWord = () => {
-  if (newSensitiveWord.value && !sensitiveWords.value.includes(newSensitiveWord.value)) {
-    sensitiveWords.value.push(newSensitiveWord.value)
-    newSensitiveWord.value = ''
-    ElMessage.success('添加成功')
-  }
-}
-const removeSensitiveWord = (word: string) => {
-  sensitiveWords.value = sensitiveWords.value.filter(w => w !== word)
-}
-const handleImportWords = () => {
-  ElMessage.success('模拟导入 Excel 成功，新增 5 个敏感词')
-  sensitiveWords.value.push('外挂', '替考', '枪手', '答案', '泄题')
-}
-const handleExportWords = () => {
-  ElMessage.success('模拟导出 Excel 成功')
-}
-const insertVariable = (field: keyof AIWordConfig, variable: string) => {
-  form.words[field] += variable
-}
-
 </script>
 
 <template>
-  <div class="ai-config-page">
-    <!-- 顶部 Header -->
+  <div class="ai-settings-page">
     <div class="page-header">
-      <h1>AI 客服配置</h1>
-      <p class="subtitle">配置大模型API参数，控制学生/教师端AI客服功能</p>
+      <div>
+        <h1>AI设置</h1>
+        <p class="subtitle">统一管理 AI 客服、AI 课程助手与智能教案工具的 API 配置与权限</p>
+      </div>
+      <el-button type="primary" :icon="Refresh" @click="() => ElMessage.success('已刷新概览数据（示例）')">刷新概览</el-button>
     </div>
 
-    <!-- 主内容区 -->
-    <div class="main-content">
-      <el-tabs v-model="activeTab" type="border-card" class="config-tabs" :before-leave="handleTabLeave">
-        
-        <!-- 1. API 配置 -->
-        <el-tab-pane name="api">
-          <template #label>
-            <span class="tab-label"><el-icon><Connection /></el-icon> API 配置</span>
-          </template>
-          
-          <div class="api-config-container">
-            <!-- 左侧：模型列表与授权 -->
-            <div class="model-list-section">
-              <div class="section-header">
-                <h3>模型授权管理</h3>
-                <div class="batch-ops">
-                  <el-button size="small" @click="handleBatchAuth('student', true)">批量授权学生</el-button>
-                  <el-button size="small" @click="handleBatchAuth('teacher', true)">批量授权教师</el-button>
-                </div>
-              </div>
-              
-              <el-table 
-                :data="form.modelAuths" 
-                style="width: 100%" 
-                @selection-change="(val) => selectedAuthRows = val"
-                border
-              >
-                <el-table-column type="selection" width="40" />
-                <el-table-column prop="name" label="大模型名称" width="140" />
-                <el-table-column label="API 状态" width="100">
-                  <template #default="{ row }">
-                    <el-tag :type="row.isConfigured ? 'success' : 'info'">
-                      {{ row.isConfigured ? '已配置' : '未配置' }}
-                    </el-tag>
-                  </template>
-                </el-table-column>
-                <el-table-column label="学生端授权" width="100">
-                  <template #default="{ row }">
-                    <el-switch v-model="row.studentAuth" :disabled="!row.isConfigured" />
-                  </template>
-                </el-table-column>
-                <el-table-column label="教师端授权" width="100">
-                  <template #default="{ row }">
-                    <el-switch v-model="row.teacherAuth" :disabled="!row.isConfigured" />
-                  </template>
-                </el-table-column>
-                <el-table-column label="操作" width="80">
-                  <template #default="{ row }">
-                    <el-button link type="primary" :icon="Edit" @click="handleEditModel(row)">配置</el-button>
-                  </template>
-                </el-table-column>
-              </el-table>
-
-              <div class="default-model-setting">
-                <span>默认模型：</span>
-                <el-select v-model="form.defaultModel" @change="handleDefaultModelChange" style="width: 200px">
-                  <el-option 
-                    v-for="m in form.modelAuths" 
-                    :key="m.model" 
-                    :label="m.name" 
-                    :value="m.model" 
-                    :disabled="!m.isConfigured"
-                  />
-                </el-select>
-                <span class="hint">用户首次打开 AI 客服时使用的模型</span>
-              </div>
+    <div class="overview-card" v-if="activeTab === 'overview'">
+      <div class="overview-grid">
+        <el-card v-for="card in overviewCards" :key="card.key" shadow="hover">
+          <div class="card-head">
+            <div>
+              <p class="card-title">{{ card.title }}</p>
+              <p class="card-sub">今日调用 {{ card.calls }} 次</p>
             </div>
-
-            <!-- 右侧：API 参数编辑 -->
-            <div class="api-edit-section">
-              <div class="section-header">
-                <h3>参数配置 - {{ form.modelAuths.find(m => m.model === form.currentEditModel)?.name }}</h3>
-              </div>
-              
-              <el-form ref="formRef" :model="form" label-width="100px" class="edit-form">
-                <el-form-item label="API Key" required>
-                  <el-input v-model="currentApiKey" type="password" show-password placeholder="请输入 API 密钥" />
-                </el-form-item>
-
-                <el-form-item label="请求地址" :required="form.currentEditModel === 'custom'">
-                  <el-input v-model="currentApiUrl" :disabled="form.currentEditModel !== 'custom'" placeholder="API Endpoint" />
-                  <div class="hint" v-if="form.currentEditModel !== 'custom'">标准模型使用默认地址</div>
-                </el-form-item>
-
-                <el-row :gutter="20">
-                  <el-col :span="12">
-                    <el-form-item label="超时时间">
-                      <el-input-number v-model="form.timeout" :min="5" :max="60" />
-                    </el-form-item>
-                  </el-col>
-                  <el-col :span="12">
-                    <el-form-item label="并发限制">
-                      <el-input-number v-model="form.concurrency" :min="1" :max="50" />
-                    </el-form-item>
-                  </el-col>
-                </el-row>
-
-                <el-form-item>
-                  <div class="test-area">
-                    <el-button type="primary" plain @click="handleTestConnection" :loading="loading">测试连接</el-button>
-                    <div v-if="testStatus !== 'none'" class="test-result" :class="testStatus">
-                      <el-icon v-if="testStatus === 'success'"><CircleCheckFilled /></el-icon>
-                      <el-icon v-else><CircleCloseFilled /></el-icon>
-                      <span>{{ testMsg }}</span>
-                    </div>
-                  </div>
-                </el-form-item>
-              </el-form>
-              
-              <div class="save-bar">
-                <el-button type="warning" size="large" @click="handleSave(formRef)" style="width: 100%">保存所有配置</el-button>
-              </div>
+            <el-tag :type="card.enabled ? 'success' : 'info'">{{ card.enabled ? '已启用' : '未启用' }}</el-tag>
+          </div>
+          <div class="card-metrics">
+            <div>
+              <p class="metric-value">{{ card.success }}%</p>
+              <p class="metric-label">成功率</p>
+            </div>
+            <div>
+              <p class="metric-value warn">{{ card.error }}%</p>
+              <p class="metric-label">异常率</p>
             </div>
           </div>
-        </el-tab-pane>
-
-        <!-- 2. 功能设置 -->
-        <el-tab-pane name="function">
-          <template #label>
-            <span class="tab-label"><el-icon><Setting /></el-icon> 功能设置</span>
-          </template>
-          
-          <el-form label-width="180px" class="config-form">
-            <el-divider content-position="left">基础功能</el-divider>
-            <el-form-item label="AI 客服总开关">
-              <el-switch v-model="form.functions.enableAI" active-text="开启" inactive-text="关闭" />
-            </el-form-item>
-            
-            <el-form-item label="流式响应 (Stream)">
-              <el-switch v-model="form.functions.enableStream" />
-              <span class="hint">开启后打字机效果输出，体验更佳</span>
-            </el-form-item>
-
-            <el-divider content-position="left">会话管理 (类豆包配置)</el-divider>
-            <el-row :gutter="20">
-              <el-col :span="12">
-                <el-form-item label="会话存储时长">
-                  <el-select v-model="form.functions.historyDuration" style="width: 100%">
-                    <el-option label="7 天" value="7d" />
-                    <el-option label="30 天" value="30d" />
-                    <el-option label="90 天" value="90d" />
-                    <el-option label="永久" value="forever" />
-                  </el-select>
-                </el-form-item>
-              </el-col>
-              <el-col :span="12">
-                <el-form-item label="单用户最大会话数">
-                  <el-input-number v-model="form.functions.maxSessions" :min="5" :max="50" />
-                </el-form-item>
-              </el-col>
-            </el-row>
-            <el-form-item label="会话自动命名">
-              <el-switch v-model="form.functions.autoRenameSession" />
-              <span class="hint">基于首条消息自动生成会话标题</span>
-            </el-form-item>
-
-            <el-divider content-position="left">交互功能</el-divider>
-            <el-row :gutter="20">
-              <el-col :span="12">
-                <el-form-item label="Markdown 渲染">
-                  <el-switch v-model="form.functions.enableMarkdown" />
-                </el-form-item>
-              </el-col>
-              <el-col :span="12">
-                <el-form-item label="语音输入功能">
-                  <el-switch v-model="form.functions.enableVoiceInput" />
-                </el-form-item>
-              </el-col>
-            </el-row>
-
-            <el-form-item label="允许用户切换模型">
-              <el-switch v-model="form.functions.allowUserSwitchModel" />
-              <span class="hint">关闭后用户只能使用默认模型</span>
-            </el-form-item>
-
-            <el-form-item label="切换模型保留会话">
-              <el-switch v-model="form.functions.keepSessionOnSwitch" />
-              <span class="hint">关闭后切换模型将清空当前对话记录</span>
-            </el-form-item>
-
-            <el-form-item label="文件上传支持">
-              <el-switch v-model="form.functions.enableFileUpload" />
-              <span class="hint">允许用户上传文档/图片进行咨询</span>
-            </el-form-item>
-            
-            <el-form-item label="允许文件类型" v-if="form.functions.enableFileUpload">
-              <el-checkbox-group v-model="form.functions.allowedFileTypes">
-                <el-checkbox label="doc">文档 (Word/TXT)</el-checkbox>
-                <el-checkbox label="pdf">PDF</el-checkbox>
-                <el-checkbox label="image">图片</el-checkbox>
-                <el-checkbox label="excel">Excel</el-checkbox>
-              </el-checkbox-group>
-            </el-form-item>
-
-            <el-form-item label="消息撤回时限">
-              <el-input-number v-model="form.functions.recallTimeLimit" :min="1" :max="30" />
-              <span class="unit">分钟</span>
-            </el-form-item>
-
-            <el-divider content-position="left">安全配置</el-divider>
-            <el-form-item label="敏感词过滤">
-              <div class="sensitive-setting">
-                <el-switch v-model="form.functions.enableSensitiveFilter" />
-                <el-button 
-                  v-if="form.functions.enableSensitiveFilter" 
-                  type="primary" 
-                  link 
-                  @click="sensitiveDialogVisible = true"
-                  style="margin-left: 10px"
-                >
-                  管理敏感词
-                </el-button>
-              </div>
-            </el-form-item>
-            
-            <el-form-item label="消息内容审核">
-              <el-switch v-model="form.functions.enableContentAudit" />
-              <span class="hint">开启后将对用户输入和AI输出进行模拟审核</span>
-            </el-form-item>
-
-            <el-form-item>
-              <el-button type="warning" size="large" @click="handleSave(formRef)">保存配置</el-button>
-            </el-form-item>
-          </el-form>
-        </el-tab-pane>
-
-        <!-- 3. 话术管理 -->
-        <el-tab-pane name="words">
-          <template #label>
-            <span class="tab-label"><el-icon><ChatDotRound /></el-icon> 话术管理</span>
-          </template>
-          
-          <el-form label-width="120px" class="config-form">
-            <el-form-item label="欢迎语">
-              <el-input 
-                v-model="form.words.welcome" 
-                type="textarea" 
-                :rows="3" 
-                placeholder="请输入欢迎语"
-              />
-              <div class="var-insert">
-                插入变量：<el-tag size="small" @click="insertVariable('welcome', '{角色}')" style="cursor: pointer">{角色}</el-tag>
-              </div>
-            </el-form-item>
-
-            <el-form-item label="未识别回复">
-              <el-input 
-                v-model="form.words.unrecognized" 
-                type="textarea" 
-                :rows="2" 
-              />
-            </el-form-item>
-
-            <el-form-item label="结束语">
-              <el-input 
-                v-model="form.words.closing" 
-                type="textarea" 
-                :rows="2" 
-              />
-            </el-form-item>
-
-            <el-form-item>
-              <el-button type="warning" size="large" @click="handleSave(formRef)">保存配置</el-button>
-            </el-form-item>
-          </el-form>
-        </el-tab-pane>
-      </el-tabs>
+          <div class="card-actions">
+            <el-button type="primary" link @click="activeTab = card.key">进入配置</el-button>
+            <el-button link @click="activeTab = 'apis'">查看API</el-button>
+          </div>
+        </el-card>
+      </div>
     </div>
 
-    <!-- 敏感词管理弹窗 -->
-    <el-dialog v-model="sensitiveDialogVisible" title="敏感词管理" width="500px">
-      <div class="sensitive-toolbar">
-        <el-input 
-          v-model="newSensitiveWord" 
-          placeholder="输入敏感词" 
-          style="width: 200px" 
-          @keyup.enter="addSensitiveWord"
-        >
-          <template #append>
-            <el-button :icon="Plus" @click="addSensitiveWord" />
-          </template>
-        </el-input>
-        <div class="tools">
-          <el-button :icon="Upload" @click="handleImportWords">导入</el-button>
-          <el-button :icon="Download" @click="handleExportWords">导出</el-button>
+    <el-tabs v-model="activeTab" type="border-card">
+      <el-tab-pane name="overview">
+        <template #label>
+          <span class="tab-label"><el-icon><View /></el-icon> API 调用总览</span>
+        </template>
+        <div class="overview-card">
+          <div class="overview-grid">
+            <el-card v-for="card in overviewCards" :key="card.key" shadow="hover">
+              <div class="card-head">
+                <div>
+                  <p class="card-title">{{ card.title }}</p>
+                  <p class="card-sub">今日调用 {{ card.calls }} 次</p>
+                </div>
+                <el-tag :type="card.enabled ? 'success' : 'info'">{{ card.enabled ? '已启用' : '未启用' }}</el-tag>
+              </div>
+              <div class="card-metrics">
+                <div>
+                  <p class="metric-value">{{ card.success }}%</p>
+                  <p class="metric-label">成功率</p>
+                </div>
+                <div>
+                  <p class="metric-value warn">{{ card.error }}%</p>
+                  <p class="metric-label">异常率</p>
+                </div>
+              </div>
+              <div class="card-actions">
+                <el-button type="primary" link @click="activeTab = card.key">进入配置</el-button>
+                <el-button link @click="activeTab = 'apis'">查看API</el-button>
+              </div>
+            </el-card>
+          </div>
         </div>
-      </div>
-      
-      <div class="sensitive-list">
-        <el-tag 
-          v-for="word in sensitiveWords" 
-          :key="word" 
-          closable 
-          @close="removeSensitiveWord(word)"
-          style="margin: 5px"
-        >
-          {{ word }}
-        </el-tag>
-      </div>
-      
+      </el-tab-pane>
+
+      <el-tab-pane name="customer">
+        <template #label>
+          <span class="tab-label"><el-icon><Connection /></el-icon> AI 客服管理</span>
+        </template>
+        <div class="feature-header">
+          <div class="title-block">
+            <h3>面向学生的知识问答</h3>
+            <p>配置 API、知识库规则、阈值与日志导出</p>
+          </div>
+          <el-switch v-model="featureConfigs.customer.enabled" @change="(val) => toggleFeature('customer', val as boolean)" />
+        </div>
+        <div class="feature-body">
+          <el-card shadow="never" class="config-card">
+            <template #header>
+              <div class="card-header">
+                <div>
+                  <div class="card-title-row">API 配置</div>
+                  <p class="hint">统一面板：新增/编辑/删除/设为默认/测试连接</p>
+                </div>
+                <el-button type="primary" :icon="Plus" @click="openApiDialog('create','customer')">新增 API</el-button>
+              </div>
+            </template>
+            <el-table :data="apiByFeature('customer').value" border style="width: 100%">
+              <el-table-column prop="name" label="名称" width="180" />
+              <el-table-column prop="model" label="模型" width="160" />
+              <el-table-column label="状态" width="120">
+                <template #default="{ row }">
+                  <el-switch v-model="row.enabled" @change="() => toggleApi(row)" />
+                </template>
+              </el-table-column>
+              <el-table-column label="默认" width="80">
+                <template #default="{ row }">
+                  <el-tag v-if="row.isDefault" type="success" size="small">默认</el-tag>
+                </template>
+              </el-table-column>
+              <el-table-column prop="endpoint" label="请求地址" min-width="220" show-overflow-tooltip />
+              <el-table-column label="限流" width="120">
+                <template #default="{ row }">{{ row.rateLimit }}/h</template>
+              </el-table-column>
+              <el-table-column label="并发" width="100">
+                <template #default="{ row }">{{ row.concurrency }}</template>
+              </el-table-column>
+              <el-table-column label="操作" width="260" fixed="right">
+                <template #default="{ row }">
+                  <el-button size="small" link @click="testApi(row)" :loading="apiTestLoading">测试连接</el-button>
+                  <el-button size="small" link type="primary" @click="setDefaultApi('customer', row.id)" :disabled="row.id === featureConfigs.customer.defaultApiId">设为默认</el-button>
+                  <el-button size="small" link type="primary" :icon="Edit" @click="openApiDialog('edit','customer', row.id)">编辑</el-button>
+                  <el-button size="small" link type="danger" :icon="Delete" @click="deleteApi(row)">删除</el-button>
+                </template>
+              </el-table-column>
+            </el-table>
+          </el-card>
+
+          <el-card shadow="never" class="config-card">
+            <template #header>
+              <div class="card-header"><el-icon><Setting /></el-icon><span>功能与阈值</span></div>
+            </template>
+            <el-form label-width="160px" class="config-form">
+              <el-form-item label="知识库管理">
+                <el-switch v-model="featureConfigs.customer.rules.knowledgeBase" />
+                <span class="hint">自定义 FAQ 与意图触发规则</span>
+              </el-form-item>
+              <el-form-item label="触发规则">
+                <el-input v-model="featureConfigs.customer.rules.kbTrigger" placeholder="关键词/意图匹配策略" />
+              </el-form-item>
+              <el-form-item label="话术模板">
+                <el-input type="textarea" v-model="featureConfigs.customer.rules.responseTemplate" :rows="3" />
+              </el-form-item>
+              <el-form-item label="超时时间 (秒)">
+                <el-input-number v-model="featureConfigs.customer.timeout" :min="5" :max="120" />
+              </el-form-item>
+              <el-form-item label="重试次数">
+                <el-input-number v-model="featureConfigs.customer.retry" :min="0" :max="5" />
+              </el-form-item>
+              <el-form-item label="频次限制 / 小时">
+                <el-input-number v-model="featureConfigs.customer.rateLimit" :min="10" :max="2000" />
+              </el-form-item>
+              <el-form-item label="并发限制">
+                <el-input-number v-model="featureConfigs.customer.concurrency" :min="1" :max="100" />
+              </el-form-item>
+              <el-form-item>
+                <el-button type="primary" :icon="Check" @click="saveFeatureConfig('customer')">保存配置</el-button>
+                <el-button :icon="Download" @click="exportLogs">导出交互数据</el-button>
+              </el-form-item>
+            </el-form>
+          </el-card>
+        </div>
+      </el-tab-pane>
+
+      <el-tab-pane name="course">
+        <template #label>
+          <span class="tab-label"><el-icon><Document /></el-icon> AI 课程助手管理</span>
+        </template>
+        <div class="feature-header">
+          <div class="title-block">
+            <h3>面向教师的资料检索问答</h3>
+            <p>配置检索 API、资料审核、权限与频次</p>
+          </div>
+          <el-switch v-model="featureConfigs.course.enabled" @change="(val) => toggleFeature('course', val as boolean)" />
+        </div>
+        <div class="feature-body">
+          <el-card shadow="never" class="config-card">
+            <template #header>
+              <div class="card-header">
+                <div>
+                  <div class="card-title-row">API 配置</div>
+                  <p class="hint">检索类模型：支持新增/编辑/删除/设为默认/测试连接</p>
+                </div>
+                <el-button type="primary" :icon="Plus" @click="openApiDialog('create','course')">新增 API</el-button>
+              </div>
+            </template>
+            <el-table :data="apiByFeature('course').value" border style="width: 100%">
+              <el-table-column prop="name" label="名称" width="180" />
+              <el-table-column prop="model" label="模型" width="160" />
+              <el-table-column label="状态" width="120">
+                <template #default="{ row }">
+                  <el-switch v-model="row.enabled" @change="() => toggleApi(row)" />
+                </template>
+              </el-table-column>
+              <el-table-column label="默认" width="80">
+                <template #default="{ row }">
+                  <el-tag v-if="row.isDefault" type="success" size="small">默认</el-tag>
+                </template>
+              </el-table-column>
+              <el-table-column prop="endpoint" label="请求地址" min-width="220" show-overflow-tooltip />
+              <el-table-column label="限流" width="120">
+                <template #default="{ row }">{{ row.rateLimit }}/h</template>
+              </el-table-column>
+              <el-table-column label="并发" width="100">
+                <template #default="{ row }">{{ row.concurrency }}</template>
+              </el-table-column>
+              <el-table-column label="操作" width="260" fixed="right">
+                <template #default="{ row }">
+                  <el-button size="small" link @click="testApi(row)" :loading="apiTestLoading">测试连接</el-button>
+                  <el-button size="small" link type="primary" @click="setDefaultApi('course', row.id)" :disabled="row.id === featureConfigs.course.defaultApiId">设为默认</el-button>
+                  <el-button size="small" link type="primary" :icon="Edit" @click="openApiDialog('edit','course', row.id)">编辑</el-button>
+                  <el-button size="small" link type="danger" :icon="Delete" @click="deleteApi(row)">删除</el-button>
+                </template>
+              </el-table-column>
+            </el-table>
+          </el-card>
+
+          <el-card shadow="never" class="config-card">
+            <template #header>
+              <div class="card-header"><el-icon><Setting /></el-icon><span>资料与权限</span></div>
+            </template>
+            <el-form label-width="180px" class="config-form">
+              <el-form-item label="资料审核">
+                <el-switch v-model="featureConfigs.course.rules.reviewRequired" />
+                <span class="hint">开启后教师上传资料需审核后才能检索</span>
+              </el-form-item>
+              <el-form-item label="学科/年级权限">
+                <el-select v-model="featureConfigs.course.rules.subjectScopes" multiple style="width: 100%" placeholder="选择可用范围">
+                  <el-option v-for="sub in ['数学','英语','物理','化学','历史','生物']" :key="sub" :label="sub" :value="sub" />
+                </el-select>
+              </el-form-item>
+              <el-form-item label="结果呈现">
+                <el-radio-group v-model="featureConfigs.course.rules.responseFormat">
+                  <el-radio label="concise">精简模式</el-radio>
+                  <el-radio label="detail">详细模式</el-radio>
+                </el-radio-group>
+              </el-form-item>
+              <el-form-item label="教师日调用上限">
+                <el-input-number v-model="featureConfigs.course.rules.teacherDailyLimit" :min="50" :max="2000" />
+              </el-form-item>
+              <el-form-item label="学科日调用上限">
+                <el-input-number v-model="featureConfigs.course.rules.subjectDailyLimit" :min="100" :max="5000" />
+              </el-form-item>
+              <el-form-item>
+                <el-button type="primary" :icon="Check" @click="saveFeatureConfig('course')">保存配置</el-button>
+                <el-button :icon="Tickets" @click="exportLogs">导出调用日志</el-button>
+              </el-form-item>
+            </el-form>
+          </el-card>
+        </div>
+      </el-tab-pane>
+
+      <el-tab-pane name="lesson">
+        <template #label>
+          <span class="tab-label"><el-icon><DataLine /></el-icon> 智能教案工具管理</span>
+        </template>
+        <div class="feature-header">
+          <div class="title-block">
+            <h3>面向教师的教案转 PPT</h3>
+            <p>配置生成类 API、模板与频次限制</p>
+          </div>
+          <el-switch v-model="featureConfigs.lesson.enabled" @change="(val) => toggleFeature('lesson', val as boolean)" />
+        </div>
+        <div class="feature-body">
+          <el-card shadow="never" class="config-card">
+            <template #header>
+              <div class="card-header">
+                <div>
+                  <div class="card-title-row">API 配置</div>
+                  <p class="hint">生成类模型：支持新增/编辑/删除/设为默认/测试连接</p>
+                </div>
+                <el-button type="primary" :icon="Plus" @click="openApiDialog('create','lesson')">新增 API</el-button>
+              </div>
+            </template>
+            <el-table :data="apiByFeature('lesson').value" border style="width: 100%">
+              <el-table-column prop="name" label="名称" width="180" />
+              <el-table-column prop="model" label="模型" width="160" />
+              <el-table-column label="状态" width="120">
+                <template #default="{ row }">
+                  <el-switch v-model="row.enabled" @change="() => toggleApi(row)" />
+                </template>
+              </el-table-column>
+              <el-table-column label="默认" width="80">
+                <template #default="{ row }">
+                  <el-tag v-if="row.isDefault" type="success" size="small">默认</el-tag>
+                </template>
+              </el-table-column>
+              <el-table-column prop="endpoint" label="请求地址" min-width="220" show-overflow-tooltip />
+              <el-table-column label="限流" width="120">
+                <template #default="{ row }">{{ row.rateLimit }}/h</template>
+              </el-table-column>
+              <el-table-column label="并发" width="100">
+                <template #default="{ row }">{{ row.concurrency }}</template>
+              </el-table-column>
+              <el-table-column label="操作" width="260" fixed="right">
+                <template #default="{ row }">
+                  <el-button size="small" link @click="testApi(row)" :loading="apiTestLoading">测试连接</el-button>
+                  <el-button size="small" link type="primary" @click="setDefaultApi('lesson', row.id)" :disabled="row.id === featureConfigs.lesson.defaultApiId">设为默认</el-button>
+                  <el-button size="small" link type="primary" :icon="Edit" @click="openApiDialog('edit','lesson', row.id)">编辑</el-button>
+                  <el-button size="small" link type="danger" :icon="Delete" @click="deleteApi(row)">删除</el-button>
+                </template>
+              </el-table-column>
+            </el-table>
+          </el-card>
+
+          <el-card shadow="never" class="config-card">
+            <template #header>
+              <div class="card-header"><el-icon><Setting /></el-icon><span>模板与规则</span></div>
+            </template>
+            <el-form label-width="180px" class="config-form">
+              <el-form-item label="PPT 模板">
+                <el-select v-model="featureConfigs.lesson.rules.template" style="width: 260px">
+                  <el-option label="通用教学模板" value="通用教学模板" />
+                  <el-option label="理科模板" value="理科模板" />
+                  <el-option label="文科模板" value="文科模板" />
+                </el-select>
+                <span class="hint">可上传校级/学科模板后选择使用</span>
+              </el-form-item>
+              <el-form-item label="最大页数">
+                <el-input-number v-model="featureConfigs.lesson.rules.maxSlides" :min="10" :max="40" />
+              </el-form-item>
+              <el-form-item label="生成字数上限">
+                <el-input-number v-model="featureConfigs.lesson.rules.wordLimit" :min="1000" :max="6000" />
+              </el-form-item>
+              <el-form-item label="可用时段">
+                <el-input v-model="featureConfigs.lesson.rules.scheduleWindow" placeholder="如 08:00-22:00" />
+              </el-form-item>
+              <el-form-item label="允许导出 PPT">
+                <el-switch v-model="featureConfigs.lesson.rules.enableExport" />
+              </el-form-item>
+              <el-form-item label="频次限制 / 教师">
+                <el-input-number v-model="featureConfigs.lesson.rateLimit" :min="10" :max="500" />
+              </el-form-item>
+              <el-form-item>
+                <el-button type="primary" :icon="Check" @click="saveFeatureConfig('lesson')">保存配置</el-button>
+                <el-button :icon="Warning" @click="exportLogs">导出生成日志</el-button>
+              </el-form-item>
+            </el-form>
+          </el-card>
+        </div>
+      </el-tab-pane>
+
+      <el-tab-pane name="apis">
+        <template #label>
+          <span class="tab-label"><el-icon><Connection /></el-icon> API 配置列表</span>
+        </template>
+        <el-card shadow="never">
+          <template #header>
+            <div class="card-header">
+              <div>
+                <h3>统一 API 配置面板</h3>
+                <p class="hint">新增/编辑/删除/设为默认/测试连接；示例说明：API 密钥来自模型服务商，请勿泄露；调用频次限制为单小时最大调用次数。</p>
+              </div>
+              <el-button type="primary" :icon="Plus" @click="openApiDialog('create','customer')">新增 API</el-button>
+            </div>
+          </template>
+
+          <el-table :data="allApis" border style="width: 100%">
+            <el-table-column prop="name" label="API 名称" width="180" />
+            <el-table-column prop="model" label="模型" width="160" />
+            <el-table-column label="所属功能" width="160">
+              <template #default="{ row }">
+                <el-tag size="small">{{ featureName(row.feature) }}</el-tag>
+              </template>
+            </el-table-column>
+            <el-table-column prop="endpoint" label="请求地址" min-width="200" show-overflow-tooltip />
+            <el-table-column label="超时/重试" width="140">
+              <template #default="{ row }">{{ row.timeout }}s / {{ row.retry }}</template>
+            </el-table-column>
+            <el-table-column label="频次/并发" width="140">
+              <template #default="{ row }">{{ row.rateLimit }}/h / {{ row.concurrency }}</template>
+            </el-table-column>
+            <el-table-column label="默认" width="80">
+              <template #default="{ row }">
+                <el-tag v-if="row.isDefault" type="success" size="small">默认</el-tag>
+              </template>
+            </el-table-column>
+            <el-table-column label="状态" width="100">
+              <template #default="{ row }">
+                <el-switch v-model="row.enabled" @change="() => toggleApi(row)" />
+              </template>
+            </el-table-column>
+            <el-table-column label="上次测试" width="120">
+              <template #default="{ row }">
+                <el-tag v-if="row.lastTest === 'success'" type="success" size="small">成功</el-tag>
+                <el-tag v-else-if="row.lastTest === 'fail'" type="danger" size="small">失败</el-tag>
+                <span v-else>未测试</span>
+              </template>
+            </el-table-column>
+            <el-table-column label="操作" width="280" fixed="right">
+              <template #default="{ row }">
+                <el-button size="small" link @click="testApi(row)" :loading="apiTestLoading">测试连接</el-button>
+                <el-button size="small" link type="primary" @click="setDefaultApi(row.feature, row.id)">设为默认</el-button>
+                <el-button size="small" link type="primary" @click="openApiDialog('edit', row.feature, row.id)" :icon="Edit">编辑</el-button>
+                <el-button size="small" link type="danger" :icon="Delete" @click="deleteApi(row)">删除</el-button>
+              </template>
+            </el-table-column>
+          </el-table>
+        </el-card>
+      </el-tab-pane>
+
+      <el-tab-pane name="logs">
+        <template #label>
+          <span class="tab-label"><el-icon><Tickets /></el-icon> 操作日志</span>
+        </template>
+        <el-card shadow="never">
+          <template #header>
+            <div class="card-header">
+              <div>
+                <h3>操作审计</h3>
+                <p class="hint">添加/修改/启用/禁用均需记录操作人、时间与内容</p>
+              </div>
+              <el-button :icon="Download" @click="exportLogs">导出日志</el-button>
+            </div>
+          </template>
+          <el-table :data="operationLogs" border>
+            <el-table-column prop="time" label="时间" width="180" />
+            <el-table-column prop="operator" label="操作人" width="120" />
+            <el-table-column prop="action" label="动作" width="140" />
+            <el-table-column prop="detail" label="详情" />
+          </el-table>
+          <div v-if="operationLogs.length === 0" class="empty-log">暂无操作，所有关键操作将自动记录</div>
+        </el-card>
+      </el-tab-pane>
+    </el-tabs>
+
+    <el-dialog v-model="apiDialogVisible" :title="apiDialogMode === 'create' ? '新增 API' : '编辑 API'" width="640px">
+      <el-form label-width="140px" class="config-form">
+        <el-form-item label="所属功能">
+          <el-tag>{{ featureName(apiDialogFeature) }}</el-tag>
+        </el-form-item>
+        <el-form-item label="API 名称" required>
+          <el-input v-model="apiForm.name" placeholder="如 Qwen 问答" />
+        </el-form-item>
+        <el-form-item label="模型标识" required>
+          <el-input v-model="apiForm.model" placeholder="模型名称或版本" />
+        </el-form-item>
+        <el-form-item label="请求地址" required>
+          <el-input v-model="apiForm.endpoint" placeholder="API Endpoint" />
+        </el-form-item>
+        <el-form-item label="API 密钥" required>
+          <el-input v-model="apiForm.apiKey" type="password" show-password placeholder="请输入密钥" />
+          <div class="hint">API密钥：模型服务商提供的调用凭证，请勿泄露</div>
+        </el-form-item>
+        <el-form-item label="请求头">
+          <el-input v-model="apiForm.headers" placeholder="k:v 多项用逗号分隔" />
+        </el-form-item>
+        <el-row :gutter="10">
+          <el-col :span="12">
+            <el-form-item label="超时时间 (秒)">
+              <el-input-number v-model="apiForm.timeout" :min="5" :max="120" />
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item label="重试次数">
+              <el-input-number v-model="apiForm.retry" :min="0" :max="5" />
+            </el-form-item>
+          </el-col>
+        </el-row>
+        <el-row :gutter="10">
+          <el-col :span="12">
+            <el-form-item label="调用频次 / 小时">
+              <el-input-number v-model="apiForm.rateLimit" :min="10" :max="5000" />
+              <div class="hint">调用频次限制：单小时最大调用次数</div>
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item label="并发限制">
+              <el-input-number v-model="apiForm.concurrency" :min="1" :max="200" />
+              <div class="hint">并发限制：同时发起的最大请求数</div>
+            </el-form-item>
+          </el-col>
+        </el-row>
+        <el-form-item label="设为默认">
+          <el-switch v-model="apiForm.isDefault" />
+        </el-form-item>
+        <el-form-item label="启用">
+          <el-switch v-model="apiForm.enabled" />
+        </el-form-item>
+      </el-form>
       <template #footer>
-        <el-button @click="sensitiveDialogVisible = false">关闭</el-button>
+        <el-button @click="apiDialogVisible = false">取消</el-button>
+        <el-button type="primary" :icon="Check" @click="saveApi">保存</el-button>
       </template>
     </el-dialog>
   </div>
 </template>
 
+<script lang="ts">
+import { defineComponent } from 'vue'
+export default defineComponent({ name: 'AIConfig' })
+</script>
+
 <style scoped>
-.ai-config-page {
-  height: 100%;
+.ai-settings-page {
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: 16px;
 }
-
 .page-header {
-  background: #fff;
-  padding: 20px;
-  border-radius: 4px;
-  box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.05);
-}
-.page-header h1 {
-  margin: 0;
-  font-size: 24px;
-  color: #303133;
-}
-.subtitle {
-  margin: 10px 0 0;
-  color: #909399;
-  font-size: 14px;
-}
-
-.main-content {
-  flex: 1;
-  background: #fff;
-  border-radius: 4px;
-  padding: 20px;
-}
-
-.config-tabs {
-  height: 100%;
-}
-
-.tab-label {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-}
-
-.api-config-container {
-  display: flex;
-  gap: 20px;
-  height: 100%;
-}
-
-.model-list-section {
-  flex: 3;
-  border-right: 1px solid #eee;
-  padding-right: 20px;
-}
-
-.api-edit-section {
-  flex: 2;
-  padding-left: 10px;
-}
-
-.section-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 15px;
+  background: #fff;
+  padding: 16px 20px;
+  border-radius: 6px;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.05);
 }
-.section-header h3 {
-  margin: 0;
-  font-size: 16px;
-  color: #303133;
-}
-
-.default-model-setting {
-  margin-top: 20px;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.config-form {
-  max-width: 800px;
-  margin-top: 20px;
-}
-
-.hint {
-  margin-left: 10px;
-  color: #909399;
-  font-size: 12px;
-}
-
-.unit {
-  margin-left: 10px;
-}
-
-.test-area {
-  display: flex;
-  align-items: center;
-  gap: 15px;
-}
-
-.test-result {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  font-size: 14px;
-}
-.test-result.success { color: #67C23A; }
-.test-result.fail { color: #F56C6C; }
-
-.sensitive-setting {
-  display: flex;
-  align-items: center;
-}
-
-.var-insert {
-  margin-top: 5px;
-  font-size: 12px;
-  color: #909399;
-}
-
-.sensitive-toolbar {
-  display: flex;
-  justify-content: space-between;
-  margin-bottom: 20px;
-}
-
-.sensitive-list {
-  min-height: 200px;
-  border: 1px solid #dcdfe6;
-  border-radius: 4px;
-  padding: 10px;
-}
+.page-header h1 { margin: 0; font-size: 22px; }
+.subtitle { margin: 6px 0 0; color: #909399; font-size: 13px; }
+.overview-card { margin-bottom: 10px; }
+.overview-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 12px; }
+.card-head { display: flex; justify-content: space-between; align-items: center; }
+.card-title { margin: 0; font-size: 16px; font-weight: 600; }
+.card-sub { margin: 6px 0 0; color: #909399; font-size: 13px; }
+.card-metrics { display: flex; gap: 24px; margin: 14px 0; }
+.metric-value { margin: 0; font-size: 22px; font-weight: bold; }
+.metric-value.warn { color: #F56C6C; }
+.metric-label { margin: 4px 0 0; color: #909399; font-size: 12px; }
+.card-actions { display: flex; gap: 10px; }
+.tab-label { display: inline-flex; align-items: center; gap: 6px; }
+.feature-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+.title-block h3 { margin: 0 0 4px; }
+.title-block p { margin: 0; color: #909399; }
+.feature-body { display: flex; flex-direction: column; gap: 12px; }
+.config-card { width: 100%; }
+.card-header { display: flex; justify-content: space-between; align-items: center; }
+.card-title-row { font-weight: 600; }
+.config-form { padding: 10px 0 0; }
+.hint { color: #909399; font-size: 12px; margin-left: 6px; }
+.empty-log { text-align: center; padding: 20px; color: #909399; }
 </style>

@@ -11,7 +11,6 @@
     "generate-manual": "node scripts/generate_manual.cjs"
   },
   "dependencies": {
-    "@mdi/font": "^7.4.47",
     "axios": "^1.7.0",
     "docx": "^8.5.0",
     "echarts": "^5.5.0",
@@ -23,10 +22,8 @@
     "qrcode": "^1.5.4",
     "sass": "^1.94.2",
     "socket.io-client": "^4.8.1",
-    "vite-plugin-vuetify": "^2.1.2",
     "vue": "^3.4.0",
-    "vue-router": "^4.3.0",
-    "vuetify": "^3.11.2"
+    "vue-router": "^4.3.0"
   },
   "devDependencies": {
     "@types/node": "^20.12.0",

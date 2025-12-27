@@ -1,10 +1,8 @@
 import asyncio
 import os
-import random
 import sys
 from collections import defaultdict
-from itertools import cycle
-from typing import Iterable, List
+from typing import Dict, List, Tuple
 
 from sqlalchemy import delete, select
 
@@ -15,176 +13,155 @@ if BASE_DIR not in sys.path:
 from app.database import AsyncSessionLocal  # noqa: E402
 from app.models.academic import (  # noqa: E402
     AcademicClass,
-    AcademicCourse,
-    AcademicCourseTeacher,
     AcademicMajor,
     AcademicStudent,
 )
-from app.models.course import Course as LegacyCourse, Teacher  # noqa: E402
-from app.models.student import Student as LegacyStudent  # noqa: E402
+from app.models.admin_user import ClassRoom
+from app.models.admin_user import StudentUser  # noqa: E402
 
-TARGET_MAJORS = [
-    "\u8ba1\u7b97\u673a",  # 计算机
-    "\u8f6f\u4ef6\u5de5\u7a0b",  # 软件工程
-    "\u7f51\u7edc\u5b89\u5168",  # 网络安全
-    "\u4eba\u5de5\u667a\u80fd",  # 人工智能
-    "\u5927\u6570\u636e",  # 大数据
-    "\u5de5\u4e1a\u4e92\u8054\u7f51",  # 工业互联网
-]
-MAJOR_NAME_MAP = {
-    "Computer Science": TARGET_MAJORS[0],
-    "Software Engineering": TARGET_MAJORS[1],
-    TARGET_MAJORS[5]: TARGET_MAJORS[5],
-}
-FALLBACK_MAJORS = cycle(TARGET_MAJORS)
-
-CLASS_SIZE_RANGE = (28, 40)
-MIN_CLASS_SIZE = 20
-COURSE_COUNT_RANGE = (8, 12)
-TEACHER_COUNT_RANGE = (1, 3)
+UNKNOWN_MAJOR_NAME = "\u672a\u8bbe\u7f6e\u4e13\u4e1a"
+ACADEMIC_CLASS_CODE_PREFIX = "t_class:"
 
 
 def normalize_major(raw: str | None) -> str:
     raw = (raw or "").strip()
     if not raw:
-        return next(FALLBACK_MAJORS)
-    if raw in MAJOR_NAME_MAP:
-        return MAJOR_NAME_MAP[raw]
-    if raw in TARGET_MAJORS:
-        return raw
-    return next(FALLBACK_MAJORS)
+        return UNKNOWN_MAJOR_NAME
+    return raw
 
 
-def iter_class_chunks(students: List[LegacyStudent]) -> Iterable[list[LegacyStudent]]:
-    if not students:
-        return
-    chunk_size = random.randint(*CLASS_SIZE_RANGE)
-    chunks = [
-        students[i : i + chunk_size]
-        for i in range(0, len(students), chunk_size)
-    ]
-    if len(chunks) > 1 and len(chunks[-1]) < MIN_CLASS_SIZE:
-        chunks[-2].extend(chunks[-1])
-        chunks.pop()
-
-    for chunk in chunks:
-        yield chunk
+def most_common(values: List[str]) -> str:
+    counter: Dict[str, int] = defaultdict(int)
+    for value in values:
+        counter[value] += 1
+    if not counter:
+        return UNKNOWN_MAJOR_NAME
+    return max(counter.items(), key=lambda kv: kv[1])[0]
 
 
 async def seed_academic_hierarchy():
     async with AsyncSessionLocal() as session:
-        for model in [
-            AcademicCourseTeacher,
-            AcademicStudent,
-            AcademicCourse,
-            AcademicClass,
-            AcademicMajor,
-        ]:
-            await session.execute(delete(model))
+        # IMPORTANT: Do NOT delete/recreate AcademicMajor (it is managed by the UI).
+        # We only keep academic_students in sync with StudentUser (t_student), and create/update
+        # academic_classes mapped from t_class.
+        await session.execute(
+            delete(AcademicStudent).where(
+                ~AcademicStudent.student_code.in_(select(StudentUser.student_no))
+            )
+        )
         await session.commit()
 
-        students_result = await session.execute(select(LegacyStudent))
-        students = students_result.scalars().all()
-        courses_result = await session.execute(select(LegacyCourse))
-        courses = courses_result.scalars().all()
-        teacher_rows = await session.execute(select(Teacher))
-        teacher_ids = [str(t.id) for t in teacher_rows.scalars().all()]
+        result = await session.execute(
+            select(StudentUser, ClassRoom)
+            .outerjoin(ClassRoom, ClassRoom.id == StudentUser.class_id)
+        )
+        student_rows: List[Tuple[StudentUser, ClassRoom | None]] = list(result.all())
 
-        if not students:
-            raise RuntimeError("students 表为空，请先导入学生数据")
-        if not courses:
-            raise RuntimeError("courses 表为空，请先导入课程数据")
+        if not student_rows:
+            raise RuntimeError("t_student 表为空，请先在【学生用户管理】中导入/新增学生")
+        # Group students by t_class.id
+        class_to_students: Dict[int, List[StudentUser]] = defaultdict(list)
+        class_to_room: Dict[int, ClassRoom | None] = {}
 
-        students_sorted = sorted(students, key=lambda s: (s.grade or "", s.id))
-        major_students: dict[str, list[LegacyStudent]] = defaultdict(list)
-        for stu in students_sorted:
-            major_students[normalize_major(stu.major)].append(stu)
+        for student, classroom in student_rows:
+            class_to_students[int(student.class_id)].append(student)
+            if int(student.class_id) not in class_to_room:
+                class_to_room[int(student.class_id)] = classroom
 
-        major_records: dict[str, AcademicMajor] = {}
-        for major_name in TARGET_MAJORS:
+        # Determine major name for each class (majority vote among students in the class)
+        class_to_major_name: Dict[int, str] = {}
+        for class_id, students in class_to_students.items():
+            majors = [normalize_major(s.major) for s in students]
+            class_to_major_name[class_id] = most_common(majors)
+
+        # Load existing majors (do not delete)
+        majors_result = await session.execute(select(AcademicMajor))
+        major_by_name: Dict[str, AcademicMajor] = {
+            m.name: m for m in majors_result.scalars().all()
+        }
+
+        for major_name in sorted(set(class_to_major_name.values())):
+            if major_name in major_by_name:
+                continue
             major = AcademicMajor(name=major_name)
             session.add(major)
             await session.flush()
-            major_records[major_name] = major
+            major_by_name[major_name] = major
 
-            grouped_by_grade: dict[str, list[LegacyStudent]] = defaultdict(list)
-            for stu in major_students.get(major_name, []):
-                grouped_by_grade[(stu.grade or "").strip()].append(stu)
+        # Load existing AcademicClass rows that are mapped from t_class
+        existing_class_rows = await session.execute(
+            select(AcademicClass).where(
+                AcademicClass.code.like(f"{ACADEMIC_CLASS_CODE_PREFIX}%")
+            )
+        )
+        academic_class_by_code: Dict[str, AcademicClass] = {
+            c.code: c for c in existing_class_rows.scalars().all() if c.code
+        }
 
-            class_index = 1
-            grade_keys = sorted(key for key in grouped_by_grade.keys() if key) or [""]
-            if "" in grouped_by_grade and "" not in grade_keys:
-                grade_keys.append("")
+        # Upsert classes
+        tclass_to_aclass: Dict[int, AcademicClass] = {}
+        for t_class_id, students in class_to_students.items():
+            major_name = class_to_major_name[t_class_id]
+            major = major_by_name[major_name]
 
-            for grade_key in grade_keys:
-                grade_students = grouped_by_grade.get(grade_key, [])
-                grade_students.sort(key=lambda s: s.id)
-                for chunk in iter_class_chunks(grade_students):
-                    suffix = "\u73ed"
-                    if grade_key:
-                        class_name = f"{major_name}{grade_key}{class_index}{suffix}"
-                    else:
-                        class_name = f"{major_name}{class_index}{suffix}"
+            classroom = class_to_room.get(t_class_id)
+            class_name = classroom.name if classroom else f"\u73ed\u7ea7{t_class_id}"
+            class_code = f"{ACADEMIC_CLASS_CODE_PREFIX}{t_class_id}"
 
-                    clazz = AcademicClass(
-                        major_id=major.id,
-                        name=class_name,
-                        student_count=len(chunk),
-                    )
-                    session.add(clazz)
-                    await session.flush()
-
-                    for stu in chunk:
-                        session.add(
-                            AcademicStudent(
-                                class_id=clazz.id,
-                                student_code=stu.id,
-                                name=stu.name,
-                            )
-                        )
-                    class_index += 1
-
-        for major in major_records.values():
-            if courses:
-                desired = random.randint(*COURSE_COUNT_RANGE)
-                count = min(len(courses), desired)
-                selected_courses = random.sample(courses, count)
+            existing = academic_class_by_code.get(class_code)
+            if existing:
+                existing.name = class_name
+                existing.major_id = major.id
+                existing.student_count = len(students)
+                tclass_to_aclass[t_class_id] = existing
             else:
-                selected_courses = []
-
-            for course in selected_courses:
-                credit = float(course.credit or 3)
-                class_hours = getattr(course, "class_hours", None)
-                if not class_hours:
-                    class_hours = int(max(credit, 2) * 16)
-
-                ac_course = AcademicCourse(
+                new_class = AcademicClass(
                     major_id=major.id,
-                    name=course.name,
-                    credit=credit,
-                    class_hours=class_hours,
+                    name=class_name,
+                    code=class_code,
+                    status=1,
+                    student_count=len(students),
                 )
-                session.add(ac_course)
+                session.add(new_class)
                 await session.flush()
+                tclass_to_aclass[t_class_id] = new_class
 
-                linked_teacher_ids: list[str] = []
-                if course.teacher_id:
-                    linked_teacher_ids.append(str(course.teacher_id))
-                extra_needed = max(TEACHER_COUNT_RANGE[0], random.randint(*TEACHER_COUNT_RANGE)) - len(linked_teacher_ids)
-                pool = [tid for tid in teacher_ids if tid not in linked_teacher_ids]
-                random.shuffle(pool)
-                linked_teacher_ids.extend(pool[: max(0, extra_needed)])
+        # Upsert students
+        existing_students_result = await session.execute(select(AcademicStudent))
+        academic_student_by_code: Dict[str, AcademicStudent] = {
+            s.student_code: s for s in existing_students_result.scalars().all()
+        }
 
-                for teacher_id in linked_teacher_ids:
+        for students in class_to_students.values():
+            for stu in students:
+                student_code = str(stu.student_no)
+                target_class = tclass_to_aclass.get(int(stu.class_id))
+                if not target_class:
+                    continue
+
+                existing_student = academic_student_by_code.get(student_code)
+                desired_status = 1 if int(stu.status or 0) == 1 else 0
+
+                if existing_student:
+                    existing_student.class_id = target_class.id
+                    existing_student.name = stu.name
+                    existing_student.gender = int(stu.gender) if stu.gender is not None else None
+                    existing_student.mobile = stu.mobile
+                    existing_student.status = desired_status
+                else:
                     session.add(
-                        AcademicCourseTeacher(
-                            course_id=ac_course.id,
-                            teacher_id=teacher_id,
+                        AcademicStudent(
+                            class_id=target_class.id,
+                            student_code=student_code,
+                            name=stu.name,
+                            gender=int(stu.gender) if stu.gender is not None else None,
+                            mobile=stu.mobile,
+                            status=desired_status,
                         )
                     )
 
         await session.commit()
-        print("Academic hierarchy data synced from real tables.")
+        print("Academic classes/students synced from t_student (StudentUser).")
 
 
 if __name__ == "__main__":

@@ -8,12 +8,19 @@ from ..database import get_db
 from ..models.user import User, UserProfile
 from ..dependencies.auth import (
     verify_password,
+    get_password_hash,
     create_access_token,
     ACCESS_TOKEN_EXPIRE_MINUTES,
     get_current_user,
 )
+from pydantic import BaseModel
 
 router = APIRouter(tags=["Authentication"])
+
+
+class ChangePasswordRequest(BaseModel):
+    old_password: str
+    new_password: str
 
 @router.post("/token")
 async def login_for_access_token(request: Request, db: AsyncSession = Depends(get_db)):
@@ -118,6 +125,21 @@ def get_role_name(role: str) -> str:
         "admin": "管理员"
     }
     return role_names.get(role, role)
+
+
+@router.post("/auth/change-password")
+async def change_password(
+    payload: ChangePasswordRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    # Self-service password change for any logged-in user (students included)
+    # Accept legacy plain-text passwords to allow upgrade on first change
+    if not verify_password(payload.old_password, current_user.password) and payload.old_password != current_user.password:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="原密码错误")
+    current_user.password = get_password_hash(payload.new_password)
+    await db.commit()
+    return {"message": "Password updated"}
 
 
 @router.get("/auth/me")

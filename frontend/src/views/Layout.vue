@@ -2,7 +2,6 @@
 import { useRoute, useRouter } from 'vue-router'
 import { computed, ref, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { OfficeBuilding, Tickets, MagicStick } from '@element-plus/icons-vue'
 import TeacherAIChat from '../components/TeacherAIChat.vue'
 import StudentAIChat from '../components/StudentAIChat.vue'
 import ThemeSwitcher from '../components/ThemeSwitcher.vue'
@@ -58,7 +57,9 @@ const menus = computed(() => {
     { path: '/student/profile-center', title: '个人中心', icon: 'User', roles: ['student'] },
     { path: '/student/homework', title: '我的作业', icon: 'Edit', roles: ['student'] },
     { path: '/student/attendance', title: '上课签到', icon: 'Aim', roles: ['student'] },
+    { path: '/student/ai-service', title: 'AI客服', icon: 'Service', roles: ['student'] },
     { path: '/teacher/lesson-plan', title: '智能教案', icon: 'Document', roles: ['teacher'] },
+    { path: '/teacher/course-assistant', title: 'AI课程助手', icon: 'Search', roles: ['teacher'] },
     { path: '/teacher/grade-management', title: '成绩管理', icon: 'DataLine', roles: ['teacher'] },
     { path: '/teacher/resource-reservation', title: '资源预约', icon: 'Timer', roles: ['teacher'] },
     { path: '/teacher/leave-approval', title: '请假审批', icon: 'Stamp', roles: ['teacher'] },
@@ -67,17 +68,18 @@ const menus = computed(() => {
     { path: '/teacher/work-schedule', title: '工作安排', icon: 'Calendar', roles: ['teacher'] },
     { path: '/course', title: '课程管理', icon: 'Reading', roles: ['admin'] },
     { path: '/schedule', title: '排课管理', icon: 'Calendar', roles: ['admin'] },
-    { path: '/user-management', title: '用户管理', icon: 'User', roles: ['admin'] },
+    { path: '/academic/college-major', title: '学院专业管理', icon: 'School', roles: ['admin'] },
+    { path: '/academic/linkage', title: '专业班级管理', icon: 'Collection', roles: ['admin'] },
+    { path: '/admin/teacher-users', title: '教职工用户管理', icon: 'User', roles: ['admin'] },
+    { path: '/admin/student-users', title: '学生用户管理', icon: 'User', roles: ['admin'] },
     { path: '/admin/service-approval', title: '办事审批', icon: 'Stamp', roles: ['admin'] },
     { path: '/admin/class-adjust', title: '调课审批', icon: 'Stamp', roles: ['admin'] },
     { path: '/resource-management', title: '教学资源', icon: 'School', roles: ['admin'] },
     { path: '/reservation-audit', title: '预约审核', icon: 'Stamp', roles: ['admin'] },
-    { path: '/ai-config', title: 'AI客服配置', icon: 'Service', roles: ['admin'] },
+    { path: '/ai-config', title: 'AI设置', icon: 'Service', roles: ['admin'] },
     { path: '/system-config', title: '系统配置', icon: 'Setting', roles: ['admin'] },
-    { path: '/academic/linkage', title: '专业班级联动', icon: 'Collection', roles: ['admin', 'teacher'] },
     { path: '/instant-message', title: '即时通讯', icon: 'ChatLineRound', roles: ['student', 'teacher'] },
     { path: '/analysis', title: '学情分析', icon: 'DataAnalysis', roles: ['admin', 'teacher'] },
-    { path: '/material/dashboard', title: '切换至 Material 主题', icon: 'MagicStick', roles: ['admin', 'student', 'teacher'] },
   ]
   
   return allMenus.filter(m => m.roles.includes(role))

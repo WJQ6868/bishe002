@@ -131,22 +131,36 @@
               </el-form-item>
             </template>
 
-            <!-- 材料上传 -->
-            <div v-if="service.required_materials.length > 0" class="materials-upload-section">
+            <!-- 材料上传/文本填写 -->
+            <div v-if="displayMaterials.length > 0" class="materials-upload-section">
               <h4>材料上传</h4>
-              <div v-for="(mat, index) in service.required_materials" :key="'mat-'+index" class="upload-item">
+              <div v-for="(mat, index) in displayMaterials" :key="'mat-'+index" class="upload-item">
                 <div class="upload-label">{{ mat.name }} <span class="required">*</span></div>
+
+                <!-- 文本材料 -->
+                <el-input
+                  v-if="mat.type === 'text'"
+                  v-model="uploadedTexts[mat.name]"
+                  type="textarea"
+                  :rows="3"
+                  :placeholder="mat.placeholder || '请输入材料内容'"
+                />
+
+                <!-- 文件材料 -->
                 <el-upload
+                  v-else
                   class="upload-demo"
-                  action="#"
-                  :auto-upload="false"
-                  :on-change="getFileChangeHandler(mat.name)"
+                  action="/api/service/upload"
+                  :headers="uploadHeaders"
+                  :on-success="(res, file) => handleFileSuccess(res, file, mat.name)"
+                  :before-upload="beforeUpload"
                   :limit="1"
                   :file-list="fileLists[mat.name] || []"
+                  :show-file-list="true"
                 >
                   <el-button type="primary" link>点击上传</el-button>
                   <template #tip>
-                    <div class="el-upload__tip">支持 jpg/png/pdf 文件，不超过 5MB</div>
+                    <div class="el-upload__tip">支持 png/jpg/jpeg/pdf/doc/docx/xls/xlsx 文件，不超过 10MB</div>
                   </template>
                 </el-upload>
               </div>
@@ -164,7 +178,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, reactive } from 'vue'
+import { ref, onMounted, reactive, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import axios from 'axios'
 import { ElMessage, ElMessageBox } from 'element-plus'
@@ -181,10 +195,16 @@ const formData = reactive<Record<string, any>>({})
 const formRules = reactive<Record<string, any>>({})
 const fileLists = reactive<Record<string, any[]>>({})
 const uploadedFiles = reactive<Record<string, any>>({}) // 模拟文件上传结果
-
-const getFileChangeHandler = (matName: string) => {
-  return (file: any) => handleFileChange(file, matName)
+const uploadedTexts = reactive<Record<string, string>>({})
+const uploadHeaders = {
+  Authorization: `Bearer ${localStorage.getItem('token') || ''}`
 }
+
+const displayMaterials = computed(() => {
+  const mats = service.value?.required_materials || []
+  if (mats.length > 0) return mats
+  return [{ name: '上传材料', type: 'file', required: false, placeholder: '可上传证明材料（选填）' }]
+})
 
 const fetchDetail = async () => {
   try {
@@ -208,14 +228,29 @@ const fetchDetail = async () => {
     loading.value = false
   }
 }
+const beforeUpload = (file: File) => {
+  const limit = 10 * 1024 * 1024
+  const allowed = ['image/png', 'image/jpeg', 'application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'application/vnd.ms-excel', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet']
+  if (file.size > limit) {
+    ElMessage.error('文件大小不能超过10MB')
+    return false
+  }
+  if (!allowed.includes(file.type)) {
+    ElMessage.error('仅支持 png/jpg/jpeg/pdf/doc/docx/xls/xlsx')
+    return false
+  }
+  return true
+}
 
-const handleFileChange = (file: any, matName: string) => {
-  // 模拟文件上传，实际应上传到服务器获取 URL
-  // 这里直接存储文件名作为演示
+const handleFileSuccess = (res: any, file: any, matName: string) => {
+  if (!res?.url) {
+    ElMessage.error('文件上传失败')
+    return
+  }
   fileLists[matName] = [file]
   uploadedFiles[matName] = {
-    name: file.name,
-    url: URL.createObjectURL(file.raw) // 仅用于演示
+    name: res.name || file.name,
+    url: res.url
   }
 }
 
@@ -224,8 +259,15 @@ const submitApplication = async () => {
   
   await formRef.value.validate(async (valid: boolean) => {
     if (valid) {
-      // 校验材料是否齐全
-      const missingMaterials = service.value.required_materials.filter((mat: any) => !uploadedFiles[mat.name])
+      // 校验材料是否齐全（文本或文件），仅校验必填项
+      const missingMaterials = displayMaterials.value.filter((mat: any) => {
+        const required = mat.required !== false
+        if (!required) return false
+        if (mat.type === 'text') {
+          return !uploadedTexts[mat.name]
+        }
+        return !uploadedFiles[mat.name]
+      })
       if (missingMaterials.length > 0) {
         ElMessage.warning(`请上传: ${missingMaterials.map((m: any) => m.name).join(', ')}`)
         return
@@ -233,10 +275,19 @@ const submitApplication = async () => {
 
       submitting.value = true
       try {
-        const materials = Object.keys(uploadedFiles).map(key => ({
+        const fileMaterials = Object.keys(uploadedFiles).map(key => ({
           name: key,
+          type: 'file',
           ...uploadedFiles[key]
         }))
+
+        const textMaterials = Object.keys(uploadedTexts).map(key => ({
+          name: key,
+          type: 'text',
+          content: uploadedTexts[key]
+        }))
+
+        const materials = [...fileMaterials, ...textMaterials]
 
         await axios.post('/service/apply/submit', {
           item_id: service.value.id,

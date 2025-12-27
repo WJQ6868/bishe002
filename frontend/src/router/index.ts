@@ -22,141 +22,6 @@ const routes: RouteRecordRaw[] = [
     meta: { title: '系统架构', roles: ['admin', 'teacher', 'student'] } // 开放给所有角色演示
   },
   {
-    path: '/material',
-    component: () => import('../layouts/MaterialLayout.vue'),
-    redirect: '/material/dashboard',
-    meta: { requiresAuth: true },
-    children: [
-      {
-        path: 'dashboard',
-        name: 'MaterialDashboard',
-        component: () => import('../views/material/Dashboard.vue'),
-        meta: { title: 'Dashboard', roles: ['admin', 'student', 'teacher'] }
-      },
-      {
-        path: 'instant-message',
-        name: 'MaterialInstantMessage',
-        component: () => import('../views/material/InstantMessage.vue'),
-        meta: { title: 'Chat', roles: ['student', 'teacher'] }
-      },
-      {
-        path: 'student-leave',
-        name: 'MaterialStudentLeave',
-        component: () => import('../views/material/StudentLeave.vue'),
-        meta: { title: 'Leave Request', roles: ['student'] }
-      },
-      {
-        path: 'teacher-leave-approval',
-        name: 'MaterialTeacherLeaveApproval',
-        component: () => import('../views/material/TeacherLeaveApproval.vue'),
-        meta: { title: 'Leave Approval', roles: ['teacher'] }
-      },
-      {
-        path: 'teacher-attendance',
-        name: 'MaterialTeacherAttendance',
-        component: () => import('../views/material/TeacherAttendance.vue'),
-        meta: { title: 'Attendance', roles: ['teacher'] }
-      },
-      {
-        path: 'teacher-homework',
-        name: 'MaterialTeacherHomework',
-        component: () => import('../views/material/TeacherHomework.vue'),
-        meta: { title: 'Homework', roles: ['teacher'] }
-      },
-      {
-        path: 'teacher-work-schedule',
-        name: 'MaterialTeacherWorkSchedule',
-        component: () => import('../views/material/TeacherWorkSchedule.vue'),
-        meta: { title: 'Work Schedule', roles: ['teacher'] }
-      },
-      {
-        path: 'student-homework',
-        name: 'MaterialStudentHomework',
-        component: () => import('../views/material/StudentHomework.vue'),
-        meta: { title: 'Student Homework', roles: ['student'] }
-      },
-      {
-        path: 'calendar',
-        name: 'MaterialCalendar',
-        component: () => import('../views/material/Calendar.vue'),
-        meta: { title: 'Calendar', roles: ['admin', 'teacher', 'student'] }
-      },
-      {
-        path: 'service-hall',
-        name: 'MaterialServiceHall',
-        component: () => import('../views/material/ServiceHall.vue'),
-        meta: { title: 'Service Hall', roles: ['admin', 'teacher', 'student'] }
-      },
-      {
-        path: 'exam-certificates',
-        name: 'MaterialExamCertificates',
-        component: () => import('../views/material/ExamCertificates.vue'),
-        meta: { title: 'Exam Certificates', roles: ['admin', 'teacher', 'student'] }
-      },
-      {
-        path: 'student-course-select',
-        name: 'MaterialStudentCourseSelect',
-        component: () => import('../views/material/StudentCourseSelect.vue'),
-        meta: { title: 'Course Select', roles: ['student'] }
-      },
-      {
-        path: 'student-grade-management',
-        name: 'MaterialStudentGradeManagement',
-        component: () => import('../views/material/StudentGradeManagement.vue'),
-        meta: { title: 'Grade Management', roles: ['student'] }
-      },
-      {
-        path: 'teacher-grade-management',
-        name: 'MaterialTeacherGradeManagement',
-        component: () => import('../views/material/TeacherGradeManagement.vue'),
-        meta: { title: 'Grade Management', roles: ['teacher'] }
-      },
-      
-      {
-        path: 'course-management',
-        name: 'MaterialCourseManagement',
-        component: () => import('../views/material/CourseManagement.vue'),
-        meta: { title: 'Course Management', roles: ['admin'] }
-      },
-      {
-        path: 'schedule',
-        name: 'MaterialSchedule',
-        component: () => import('../views/material/Schedule.vue'),
-        meta: { title: 'Schedule Management', roles: ['admin'] }
-      },
-      {
-        path: 'user-management',
-        name: 'MaterialUserManagement',
-        component: () => import('../views/material/UserManagement.vue'),
-        meta: { title: 'User Management', roles: ['admin'] }
-      },
-      {
-        path: 'resource-management',
-        name: 'MaterialResourceManagement',
-        component: () => import('../views/material/ResourceManagement.vue'),
-        meta: { title: 'Resource Management', roles: ['admin'] }
-      },
-      {
-        path: 'reservation-audit',
-        name: 'MaterialReservationAudit',
-        component: () => import('../views/material/ReservationAudit.vue'),
-        meta: { title: 'Reservation Audit', roles: ['admin'] }
-      },
-      {
-        path: 'system-config',
-        name: 'MaterialSystemConfig',
-        component: () => import('../views/material/SystemConfig.vue'),
-        meta: { title: 'System Config', roles: ['admin'] }
-      },
-      {
-        path: 'analysis',
-        name: 'MaterialAnalysis',
-        component: () => import('../views/material/Analysis.vue'),
-        meta: { title: 'Analysis', roles: ['admin', 'teacher'] }
-      }
-    ]
-  },
-  {
     path: '/',
     component: Layout,
     redirect: '/dashboard',
@@ -187,10 +52,28 @@ const routes: RouteRecordRaw[] = [
         meta: { title: '用户管理', icon: 'User', roles: ['admin'] }
       },
       {
+        path: 'admin/teacher-users',
+        name: 'TeacherUserManagement',
+        component: () => import('../views/admin/TeacherUserManagement.vue'),
+        meta: { title: '教职工用户管理', icon: 'User', roles: ['admin'] }
+      },
+      {
+        path: 'admin/student-users',
+        name: 'StudentUserManagement',
+        component: () => import('../views/admin/StudentUserManagement.vue'),
+        meta: { title: '学生用户管理', icon: 'User', roles: ['admin'] }
+      },
+      {
         path: 'admin/service-approval',
         name: 'ServiceApproval',
         component: () => import('../views/admin/ServiceApproval.vue'),
         meta: { title: '办事审批', icon: 'Stamp', roles: ['admin'] }
+      },
+      {
+        path: 'admin/service-config',
+        name: 'ServiceConfig',
+        component: () => import('../views/admin/ServiceConfig.vue'),
+        meta: { title: '申请功能维护', icon: 'Setting', roles: ['admin'] }
       },
       {
         path: 'admin/class-adjust',
@@ -214,7 +97,7 @@ const routes: RouteRecordRaw[] = [
         path: 'ai-config',
         name: 'AIConfig',
         component: () => import('../views/AIConfig.vue'),
-        meta: { title: 'AI客服配置', roles: ['admin'] }
+        meta: { title: 'AI设置', roles: ['admin'] }
       },
       {
         path: 'system-config',
@@ -231,9 +114,15 @@ const routes: RouteRecordRaw[] = [
       },
       {
         path: 'academic/linkage',
-        name: 'AcademicLinkage',
-        component: () => import('../views/AcademicLinkage.vue'),
-        meta: { title: '专业班级联动', icon: 'Collection', roles: ['admin', 'teacher'] }
+        name: 'MajorClassManage',
+        component: () => import('../views/admin/MajorClassManage.vue'),
+        meta: { title: '专业班级管理', icon: 'Collection', roles: ['admin'] }
+      },
+      {
+        path: 'academic/college-major',
+        name: 'CollegeMajorManage',
+        component: () => import('../views/admin/CollegeMajorOnly.vue'),
+        meta: { title: '学院专业管理', icon: 'School', roles: ['admin'] }
       },
       {
         path: 'instant-message',
@@ -275,7 +164,7 @@ const routes: RouteRecordRaw[] = [
         path: 'service/my-applications',
         name: 'MyApplications',
         component: () => import('../views/service/MyApplications.vue'),
-        meta: { title: '我的申请', roles: ['student', 'teacher'], hidden: true }
+        meta: { title: '我的申请', roles: ['student', 'teacher', 'admin'], hidden: true }
       },
       // Student Routes
       {
@@ -303,6 +192,12 @@ const routes: RouteRecordRaw[] = [
         meta: { title: '选课管理', icon: 'List', roles: ['student'] }
       },
       {
+        path: 'student/ai-service',
+        name: 'StudentAIService',
+        component: () => import('../views/student/AIService.vue'),
+        meta: { title: 'AI客服', icon: 'Service', roles: ['student'] }
+      },
+      {
         path: 'student/leave-apply',
         name: 'StudentLeaveApply',
         component: () => import('../views/student/Leave.vue'),
@@ -313,6 +208,12 @@ const routes: RouteRecordRaw[] = [
         name: 'StudentHomework',
         component: () => import('../views/student/Homework.vue'),
         meta: { title: '我的作业', icon: 'Edit', roles: ['student'] }
+      },
+      {
+        path: 'teacher/course-assistant',
+        name: 'TeacherCourseAssistant',
+        component: () => import('../views/teacher/CourseAssistant.vue'),
+        meta: { title: 'AI课程助手', icon: 'Search', roles: ['teacher'] }
       },
       {
         path: 'student/attendance',

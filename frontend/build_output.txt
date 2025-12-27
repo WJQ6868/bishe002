@@ -1,0 +1,158 @@
+
+> frontend@0.0.0 build
+> vue-tsc -b && vite build
+
+src/components/FriendManagement.vue(8,7): error TS6133: 'props' is declared but its value is never read.
+src/components/FriendManagement.vue(210,7): error TS6133: 'updatePendingCount' is declared but its value is never read.
+src/components/StudentAIChat.vue(7,35): error TS6133: 'Document' is declared but its value is never read.
+src/components/StudentAIChat.vue(8,3): error TS6133: 'CopyDocument' is declared but its value is never read.
+src/components/StudentAIChat.vue(8,31): error TS6133: 'Back' is declared but its value is never read.
+src/components/StudentAIChat.vue(9,14): error TS6133: 'Timer' is declared but its value is never read.
+src/components/StudentAIChat.vue(9,21): error TS6133: 'Monitor' is declared but its value is never read.
+src/components/StudentAIChat.vue(17,3): error TS2353: Object literal may only specify known properties, and 'highlight' does not exist in type 'MarkedOptions<string, string>'.
+src/components/StudentAIChat.vue(17,24): error TS7006: Parameter 'code' implicitly has an 'any' type.
+src/components/StudentAIChat.vue(17,30): error TS7006: Parameter 'lang' implicitly has an 'any' type.
+src/components/TeacherAIChat.vue(7,35): error TS6133: 'Document' is declared but its value is never read.
+src/components/TeacherAIChat.vue(8,3): error TS6133: 'CopyDocument' is declared but its value is never read.
+src/components/TeacherAIChat.vue(8,31): error TS6133: 'Back' is declared but its value is never read.
+src/components/TeacherAIChat.vue(9,14): error TS6133: 'Timer' is declared but its value is never read.
+src/components/TeacherAIChat.vue(9,21): error TS6133: 'Monitor' is declared but its value is never read.
+src/components/TeacherAIChat.vue(22,3): error TS2353: Object literal may only specify known properties, and 'highlight' does not exist in type 'MarkedOptions<string, string>'.
+src/components/TeacherAIChat.vue(22,24): error TS7006: Parameter 'code' implicitly has an 'any' type.
+src/components/TeacherAIChat.vue(22,30): error TS7006: Parameter 'lang' implicitly has an 'any' type.
+src/components/TeacherAIChat.vue(210,34): error TS6133: 'event' is declared but its value is never read.
+src/components/TeacherAIChat.vue(441,32): error TS2339: Property 'loading' does not exist on type 'SFCInstallWithContext<Message>'.
+  Property 'loading' does not exist on type 'MessageFn & { primary: MessageTypedFn; success: MessageTypedFn; warning: MessageTypedFn; info: MessageTypedFn; error: MessageTypedFn; } & ObjectPlugin<...> & { ...; }'.
+src/router/index.ts(413,24): error TS6133: 'from' is declared but its value is never read.
+src/stores/theme.ts(2,15): error TS6133: 'watch' is declared but its value is never read.
+src/utils/logger.ts(1,1): error TS6133: 'axios' is declared but its value is never read.
+src/views/admin/CollegeMajorManage.vue(3,21): error TS6133: 'ElMessageBox' is declared but its value is never read.
+src/views/admin/ServiceConfig.vue(265,21): error TS6133: 'ElMessageBox' is declared but its value is never read.
+src/views/admin/UserManagement.vue(2,25): error TS6133: 'computed' is declared but its value is never read.
+src/views/admin/UserManagement.vue(32,7): error TS6133: 'roles' is declared but its value is never read.
+src/views/admin/UserManagement.vue(33,7): error TS6133: 'depts' is declared but its value is never read.
+src/views/admin/UserManagement.vue(339,29): error TS7031: Binding element 'row' implicitly has an 'any' type.
+src/views/AIConfig.vue(468,74): error TS7006: Parameter 'val' implicitly has an 'any' type.
+src/views/AIConfig.vue(557,72): error TS7006: Parameter 'val' implicitly has an 'any' type.
+src/views/AIConfig.vue(645,72): error TS7006: Parameter 'val' implicitly has an 'any' type.
+src/views/Analysis.vue(2,36): error TS6133: 'computed' is declared but its value is never read.
+src/views/Calendar.vue(209,9): error TS6133: 'last' is declared but its value is never read.
+src/views/cert/CertLinks.vue(154,29): error TS6133: 'Link' is declared but its value is never read.
+src/views/cert/CertLinks.vue(155,3): error TS6133: 'Monitor' is declared but its value is never read.
+src/views/cert/CertLinks.vue(155,12): error TS6133: 'Reading' is declared but its value is never read.
+src/views/cert/CertLinks.vue(155,21): error TS6133: 'Postcard' is declared but its value is never read.
+src/views/cert/CertLinks.vue(155,31): error TS6133: 'DataLine' is declared but its value is never read.
+src/views/cert/CertLinks.vue(155,41): error TS6133: 'Medal' is declared but its value is never read.
+src/views/cert/CertLinks.vue(155,48): error TS6133: 'Van' is declared but its value is never read.
+src/views/cert/CertLinks.vue(155,53): error TS6133: 'Microphone' is declared but its value is never read.
+src/views/cert/CertLinks.vue(155,65): error TS6133: 'School' is declared but its value is never read.
+src/views/cert/CertLinks.vue(252,9): error TS6133: 'host' is declared but its value is never read.
+src/views/cert/CertLinks.vue(287,11): error TS6133: 'resp' is declared but its value is never read.
+src/views/cert/MyCollections.vue(43,10): error TS6133: 'ArrowLeft' is declared but its value is never read.
+src/views/Course.vue(126,7): error TS6133: 'loading' is declared but its value is never read.
+src/views/InstantMessage.vue(135,30): error TS6133: 'data' is declared but its value is never read.
+src/views/Layout.vue(5,1): error TS6192: All imports in import declaration are unused.
+src/views/Login.vue(49,26): error TS6133: 'rule' is declared but its value is never read.
+src/views/material/Analysis.vue(2,36): error TS6133: 'computed' is declared but its value is never read.
+src/views/material/Calendar.vue(31,7): error TS6133: 'dateRange' is declared but its value is never read.
+src/views/material/Calendar.vue(276,16): error TS2322: Type '(files: File[]) => Promise<void>' is not assignable to type '(files: File | File[]) => any'.
+  Types of parameters 'files' and 'files' are incompatible.
+    Type 'File | File[]' is not assignable to type 'File[]'.
+      Type 'File' is missing the following properties from type 'File[]': length, pop, push, concat, and 28 more.
+src/views/material/CourseManagement.vue(215,9): error TS6133: 'selectedCourses' is declared but its value is never read.
+src/views/material/CourseManagement.vue(366,35): error TS6133: 'value' is declared but its value is never read.
+src/views/material/ExamCertificates.vue(120,9): error TS6133: 'host' is declared but its value is never read.
+src/views/material/InstantMessage.vue(2,69): error TS6133: 'watch' is declared but its value is never read.
+src/views/material/InstantMessage.vue(5,20): error TS7016: Could not find a declaration file for module 'qrcode'. 'd:/bishe/one/frontend/node_modules/qrcode/lib/index.js' implicitly has an 'any' type.
+  Try `npm i --save-dev @types/qrcode` if it exists or add a new declaration (.d.ts) file containing `declare module 'qrcode';`
+src/views/material/ReservationAudit.vue(372,16): error TS2322: Type '({ title: string; key: string; width: string; sortable?: undefined; align?: undefined; } | { title: string; key: string; width?: undefined; sortable?: undefined; align?: undefined; } | { title: string; key: string; sortable: boolean; width?: undefined; align?: undefined; } | { ...; } | { ...; })[]' is not assignable to type 'readonly { readonly key?: (string & {}) | "data-table-group" | "data-table-select" | "data-table-expand" | undefined; readonly value?: SelectItemKey<ReservationAudit>; ... 14 more ...; readonly children?: readonly any[] | undefined; }[]'.
+  Type '{ title: string; key: string; width: string; sortable?: undefined; align?: undefined; } | { title: string; key: string; width?: undefined; sortable?: undefined; align?: undefined; } | { title: string; key: string; sortable: boolean; width?: undefined; align?: undefined; } | { ...; } | { ...; }' is not assignable to type '{ readonly key?: (string & {}) | "data-table-group" | "data-table-select" | "data-table-expand" | undefined; readonly value?: SelectItemKey<ReservationAudit>; ... 14 more ...; readonly children?: readonly any[] | undefined; }'.
+    Type '{ title: string; key: string; align: string; width?: undefined; sortable?: undefined; }' is not assignable to type '{ readonly key?: (string & {}) | "data-table-group" | "data-table-select" | "data-table-expand" | undefined; readonly value?: SelectItemKey<ReservationAudit>; ... 14 more ...; readonly children?: readonly any[] | undefined; }'.
+      Types of property 'align' are incompatible.
+        Type 'string' is not assignable to type '"end" | "center" | "start" | undefined'.
+src/views/material/ResourceManagement.vue(80,15): error TS6133: 'val' is declared but its value is never read.
+src/views/material/ResourceManagement.vue(266,7): error TS6133: 'handleDelete' is declared but its value is never read.
+src/views/material/ResourceManagement.vue(266,23): error TS6133: 'row' is declared but its value is never read.
+src/views/material/ResourceManagement.vue(312,33): error TS6133: 'row' is declared but its value is never read.
+src/views/material/ServiceHall.vue(95,29): error TS6133: 'item' is declared but its value is never read.
+src/views/material/ServiceHall.vue(105,7): error TS6133: 'getCategoryIcon' is declared but its value is never read.
+src/views/material/StudentCourseSelect.vue(42,71): error TS6133: 'confirmText' is declared but its value is never read.
+src/views/material/StudentGradeManagement.vue(2,15): error TS6133: 'reactive' is declared but its value is never read.
+src/views/material/StudentLeave.vue(2,36): error TS6133: 'computed' is declared but its value is never read.
+src/views/material/StudentLeave.vue(7,7): error TS6133: 'theme' is declared but its value is never read.
+src/views/material/StudentLeave.vue(8,7): error TS6133: 'router' is declared but its value is never read.
+src/views/material/StudentLeave.vue(77,21): error TS2352: Conversion of type 'null' to type 'string' may be a mistake because neither type sufficiently overlaps with the other. If this was intentional, convert the expression to 'unknown' first.
+src/views/material/TeacherAttendance.vue(7,1): error TS6133: 'useTheme' is declared but its value is never read.
+src/views/material/TeacherAttendance.vue(8,20): error TS7016: Could not find a declaration file for module 'qrcode'. 'd:/bishe/one/frontend/node_modules/qrcode/lib/index.js' implicitly has an 'any' type.
+  Try `npm i --save-dev @types/qrcode` if it exists or add a new declaration (.d.ts) file containing `declare module 'qrcode';`
+src/views/material/TeacherAttendance.vue(373,44): error TS6133: 'item' is declared but its value is never read.
+src/views/material/TeacherHomework.vue(6,36): error TS6133: 'computed' is declared but its value is never read.
+src/views/material/TeacherHomework.vue(41,7): error TS6133: 'activeTab' is declared but its value is never read.
+src/views/material/TeacherHomework.vue(156,26): error TS6133: 'hwId' is declared but its value is never read.
+src/views/material/TeacherLeaveApproval.vue(2,26): error TS6133: 'computed' is declared but its value is never read.
+src/views/material/TeacherLeaveApproval.vue(6,7): error TS6133: 'theme' is declared but its value is never read.
+src/views/material/TeacherWorkSchedule.vue(28,7): error TS6133: 'currentDate' is declared but its value is never read.
+src/views/material/UserManagement.vue(2,25): error TS6133: 'computed' is declared but its value is never read.
+src/views/material/UserManagement.vue(30,7): error TS6133: 'roles' is declared but its value is never read.
+src/views/material/UserManagement.vue(31,7): error TS6133: 'depts' is declared but its value is never read.
+src/views/material/UserManagement.vue(83,3): error TS2322: Type '() => void | Promise<void>' is not assignable to type '() => Promise<void>'.
+  Type 'void | Promise<void>' is not assignable to type 'Promise<void>'.
+    Type 'void' is not assignable to type 'Promise<void>'.
+src/views/material/UserManagement.vue(261,7): error TS6133: 'rowProps' is declared but its value is never read.
+src/views/material/UserManagement.vue(309,10): error TS2322: Type '({ title: string; key: string; align: string; sortable?: undefined; width?: undefined; } | { title: string; key: string; align?: undefined; sortable?: undefined; width?: undefined; } | { title: string; key: string; sortable: boolean; align: string; width: string; })[]' is not assignable to type 'readonly { readonly key?: (string & {}) | "data-table-group" | "data-table-select" | "data-table-expand" | undefined; readonly value?: SelectItemKey<{ id: number; account: string; name: string; role: "student" | "admin" | "teacher"; ... 4 more ...; createTime: string; }>; ... 14 more ...; readonly children?: readonl...'.
+  Type '{ title: string; key: string; align: string; sortable?: undefined; width?: undefined; } | { title: string; key: string; align?: undefined; sortable?: undefined; width?: undefined; } | { title: string; key: string; sortable: boolean; align: string; width: string; }' is not assignable to type '{ readonly key?: (string & {}) | "data-table-group" | "data-table-select" | "data-table-expand" | undefined; readonly value?: SelectItemKey<{ id: number; account: string; name: string; role: "student" | "admin" | "teacher"; ... 4 more ...; createTime: string; }>; ... 14 more ...; readonly children?: readonly any[] |...'.
+    Type '{ title: string; key: string; align: string; sortable?: undefined; width?: undefined; }' is not assignable to type '{ readonly key?: (string & {}) | "data-table-group" | "data-table-select" | "data-table-expand" | undefined; readonly value?: SelectItemKey<{ id: number; account: string; name: string; role: "student" | "admin" | "teacher"; ... 4 more ...; createTime: string; }>; ... 14 more ...; readonly children?: readonly any[] |...'.
+      Types of property 'align' are incompatible.
+        Type 'string' is not assignable to type '"end" | "center" | "start" | undefined'.
+src/views/RequirementsAnalysis.vue(2,15): error TS6133: 'reactive' is declared but its value is never read.
+src/views/RequirementsAnalysis.vue(170,29): error TS2304: Cannot find name 'computed'.
+src/views/ReservationAudit.vue(3,21): error TS6133: 'ElMessageBox' is declared but its value is never read.
+src/views/ReservationAudit.vue(4,49): error TS6133: 'User' is declared but its value is never read.
+src/views/ReservationAudit.vue(4,55): error TS6133: 'Calendar' is declared but its value is never read.
+src/views/ReservationAudit.vue(39,45): error TS6133: 'tableError' is declared but its value is never read.
+src/views/ReservationAudit.vue(375,33): error TS7031: Binding element 'row' implicitly has an 'any' type.
+src/views/ResourceManagement.vue(213,7): error TS6133: 'handleDelete' is declared but its value is never read.
+src/views/ResourceManagement.vue(338,57): error TS2339: Property 'tableLoading' does not exist on type 'CreateComponentPublicInstanceWithMixins<ToResolvedProps<{}, {}>, { Plus: DefineComponent<{}, void, {}, {}, {}, ComponentOptionsMixin, ComponentOptionsMixin, ... 12 more ..., any>; ... 26 more ...; handleExport: () => void; }, ... 23 more ..., {}>'.
+src/views/ResourceManagement.vue(370,88): error TS2554: Expected 0 arguments, but got 1.
+src/views/ResourceManagement.vue(420,38): error TS2339: Property 'type' does not exist on type '{ id: number; code: string; name: string; capacity: number; location: string; devices: string[]; status: ResourceStatus; remark: string; }'.
+src/views/ResourceManagement.vue(430,38): error TS2339: Property 'manager' does not exist on type '{ id: number; code: string; name: string; capacity: number; location: string; devices: string[]; status: ResourceStatus; remark: string; }'.
+src/views/ResourceManagement.vue(436,37): error TS2339: Property 'safetyRequirements' does not exist on type '{ id: number; code: string; name: string; capacity: number; location: string; devices: string[]; status: ResourceStatus; remark: string; }'.
+src/views/ResourceManagement.vue(443,38): error TS2339: Property 'type' does not exist on type '{ id: number; code: string; name: string; capacity: number; location: string; devices: string[]; status: ResourceStatus; remark: string; }'.
+src/views/ResourceManagement.vue(450,37): error TS2339: Property 'resourceName' does not exist on type '{ id: number; code: string; name: string; capacity: number; location: string; devices: string[]; status: ResourceStatus; remark: string; }'.
+src/views/ResourceManagement.vue(453,43): error TS2339: Property 'purchaseTime' does not exist on type '{ id: number; code: string; name: string; capacity: number; location: string; devices: string[]; status: ResourceStatus; remark: string; }'.
+src/views/ResourceManagement.vue(456,37): error TS2339: Property 'spec' does not exist on type '{ id: number; code: string; name: string; capacity: number; location: string; devices: string[]; status: ResourceStatus; remark: string; }'.
+src/views/service/ServiceDetail.vue(155,33): error TS7006: Parameter 'res' implicitly has an 'any' type.
+src/views/service/ServiceDetail.vue(155,38): error TS7006: Parameter 'file' implicitly has an 'any' type.
+src/views/student/Attendance.vue(6,15): error TS6133: 'reactive' is declared but its value is never read.
+src/views/student/CourseManagement.vue(356,33): error TS7031: Binding element 'row' implicitly has an 'any' type.
+src/views/student/GradeManagement.vue(170,9): error TS6133: 'targetSemester' is declared but its value is never read.
+src/views/student/GradeManagement.vue(267,29): error TS7031: Binding element 'row' implicitly has an 'any' type.
+src/views/student/Homework.vue(7,21): error TS6133: 'ElMessageBox' is declared but its value is never read.
+src/views/student/Leave.vue(7,35): error TS6133: 'UploadFile' is declared but its value is never read.
+src/views/student/Leave.vue(8,10): error TS6133: 'Plus' is declared but its value is never read.
+src/views/student/Leave.vue(8,16): error TS6133: 'Refresh' is declared but its value is never read.
+src/views/student/Leave.vue(50,7): error TS6133: 'studentId' is declared but its value is never read.
+src/views/student/Leave.vue(251,34): error TS7006: Parameter 'time' implicitly has an 'any' type.
+src/views/student/ProfileCenter.vue(90,19): error TS6133: 'rule' is declared but its value is never read.
+src/views/student/ProfileCenter.vue(476,88): error TS7031: Binding element 'row' implicitly has an 'any' type.
+src/views/SystemConfig.vue(202,49): error TS7006: Parameter 'tab' implicitly has an 'any' type.
+src/views/teacher/Attendance.vue(6,15): error TS6133: 'reactive' is declared but its value is never read.
+src/views/teacher/Attendance.vue(6,46): error TS6133: 'nextTick' is declared but its value is never read.
+src/views/teacher/Attendance.vue(7,21): error TS6133: 'ElMessageBox' is declared but its value is never read.
+src/views/teacher/Attendance.vue(262,73): error TS7006: Parameter 'val' implicitly has an 'any' type.
+src/views/teacher/Homework.vue(6,36): error TS6133: 'computed' is declared but its value is never read.
+src/views/teacher/Homework.vue(7,21): error TS6133: 'ElMessageBox' is declared but its value is never read.
+src/views/teacher/Homework.vue(8,1): error TS6192: All imports in import declaration are unused.
+src/views/teacher/Homework.vue(142,26): error TS6133: 'hwId' is declared but its value is never read.
+src/views/teacher/Leave.vue(8,10): error TS6133: 'Check' is declared but its value is never read.
+src/views/teacher/Leave.vue(8,17): error TS6133: 'Close' is declared but its value is never read.
+src/views/teacher/ResourceReservation.vue(4,10): error TS6133: 'Search' is declared but its value is never read.
+src/views/teacher/ResourceReservation.vue(4,18): error TS6133: 'Calendar' is declared but its value is never read.
+src/views/teacher/ResourceReservation.vue(4,28): error TS6133: 'User' is declared but its value is never read.
+src/views/teacher/ResourceReservation.vue(4,34): error TS6133: 'Phone' is declared but its value is never read.
+src/views/teacher/ResourceReservation.vue(4,41): error TS6133: 'Timer' is declared but its value is never read.
+src/views/teacher/ResourceReservation.vue(4,48): error TS6133: 'CircleCheck' is declared but its value is never read.
+src/views/teacher/ResourceReservation.vue(4,61): error TS6133: 'CircleClose' is declared but its value is never read.
+src/views/teacher/WorkSchedule.vue(6,36): error TS6133: 'computed' is declared but its value is never read.
+src/views/teacher/WorkSchedule.vue(7,21): error TS6133: 'ElMessageBox' is declared but its value is never read.
+src/views/teacher/WorkSchedule.vue(120,7): error TS6133: 'formatTime' is declared but its value is never read.

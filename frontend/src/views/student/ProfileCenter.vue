@@ -4,6 +4,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { User, Lock, Location, Bell, Edit, Check, Close } from '@element-plus/icons-vue'
 import { useRouter } from 'vue-router'
 import { clearAuthState } from '../../utils/auth'
+import axios from 'axios'
 
 const router = useRouter()
 
@@ -76,10 +77,10 @@ const passwordRules = {
   oldPwd: [{ required: true, message: '请输入原密码', trigger: 'blur' }],
   newPwd: [
     { required: true, message: '请输入新密码', trigger: 'blur' },
-    { min: 8, message: '密码长度至少8位', trigger: 'blur' },
+    { min: 6, message: '密码长度至少6位', trigger: 'blur' },
     { 
-      pattern: /^(?=.*[A-Za-z])(?=.*\d)[A-Za-z\d]{8,}$/, 
-      message: '密码必须包含字母和数字', 
+      pattern: /^(?=.*[A-Za-z])(?=.*\d)[A-Za-z\d]{6,}$/, 
+      message: '密码需包含字母和数字', 
       trigger: 'blur' 
     }
   ],
@@ -187,19 +188,23 @@ const resetAvatar = () => {
 const changePassword = async () => {
   if (!passwordFormRef.value) return
   
-  await passwordFormRef.value.validate((valid: boolean) => {
-    if (valid) {
-      // 校验原密码
-      if (passwordForm.oldPwd !== '123456') {
-        ElMessage.error('原密码错误')
-        return
-      }
-      
+  await passwordFormRef.value.validate(async (valid: boolean) => {
+    if (!valid) return
+    try {
+      const token = localStorage.getItem('token')
+      await axios.post('auth/change-password', {
+        old_password: passwordForm.oldPwd,
+        new_password: passwordForm.newPwd,
+      }, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      })
       ElMessage.success('密码修改成功，请重新登录')
       setTimeout(() => {
         clearAuthState()
         router.push('/login')
-      }, 1500)
+      }, 1200)
+    } catch (e: any) {
+      ElMessage.error(e?.response?.data?.detail || '修改失败')
     }
   })
 }

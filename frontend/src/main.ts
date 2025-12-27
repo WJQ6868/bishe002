@@ -8,7 +8,6 @@ import zhCn from 'element-plus/es/locale/lang/zh-cn'
 import dayjs from 'dayjs'
 import 'dayjs/locale/zh-cn'
 import * as ElementPlusIconsVue from '@element-plus/icons-vue'
-import { vuetify } from './plugins/vuetify'
 import router from './router'
 import App from './App.vue'
 import axios from 'axios'
@@ -23,7 +22,6 @@ dayjs.locale('zh-cn')
 app.use(createPinia())
 app.use(router)
 app.use(ElementPlus, { locale: zhCn })
-app.use(vuetify)
 
 for (const [key, component] of Object.entries(ElementPlusIconsVue)) {
   app.component(key, component)
