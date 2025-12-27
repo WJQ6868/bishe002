@@ -56,6 +56,12 @@ if [[ -z "${DOMAIN}" ]]; then
   DOMAIN="${DOMAIN:-_}"
 fi
 
+if [[ "${DOMAIN}" == "_" ]]; then
+  echo "[WARN] 未能自动探测到可用的 server_name，将使用 '_'。" >&2
+  echo "[WARN] 这可能与系统默认站点冲突，导致访问域名仍显示 Welcome to nginx。" >&2
+  echo "[WARN] 建议显式指定：--domain \"你的域名 你的服务器IP\"" >&2
+fi
+
 require_root() {
   if [[ "${EUID}" -ne 0 ]]; then
     echo "请用 root 运行（建议 sudo）。" >&2
@@ -239,6 +245,16 @@ EOF
 
   systemctl daemon-reload
   systemctl enable --now ${APP_NAME}-backend.service
+
+  # Nginx：禁用系统默认站点（避免访问域名时仍显示 Welcome to nginx）
+  # Ubuntu/Debian 常见：/etc/nginx/sites-enabled/default
+  if [[ -e "/etc/nginx/sites-enabled/default" ]]; then
+    rm -f "/etc/nginx/sites-enabled/default"
+  fi
+  # CentOS/RHEL 系常见：/etc/nginx/conf.d/default.conf
+  if [[ -e "/etc/nginx/conf.d/default.conf" ]]; then
+    mv -f "/etc/nginx/conf.d/default.conf" "/etc/nginx/conf.d/default.conf.bak" || true
+  fi
 
   # Nginx
   cat >"${NGINX_CONF_PATH}" <<EOF

@@ -134,3 +134,29 @@ sudo ./deploy_linux.sh --domain <你的域名或服务器IP>
 nginx -t
 sudo systemctl reload nginx
 ```
+
+### 打开域名看到 Welcome to nginx（不是项目页面）
+
+通常原因有两种：
+
+1) 域名没有解析到这台服务器 IP。
+2) Nginx 仍在使用系统默认站点（例如 Ubuntu/Debian 的 `sites-enabled/default` 或 CentOS/RHEL 的 `conf.d/default.conf`），你的项目站点没有生效。
+
+在服务器上排查：
+
+```bash
+# 1) 确认本机 Nginx 当前加载了哪些 server_name
+sudo nginx -T | grep -n "server_name" | head
+
+# 2) 确认项目站点配置是否存在
+ls -l /etc/nginx/conf.d/ | sed -n '1,120p'
+
+# 3) 确认域名是否指向本机
+curl -fsS http://127.0.0.1/ -I
+```
+
+修复（推荐）：重新部署并指定域名 + IP（脚本会自动禁用默认站点配置并 reload Nginx）：
+
+```bash
+sudo ./deploy_linux.sh --domain "wangjiaqi.me 47.98.128.206"
+```
