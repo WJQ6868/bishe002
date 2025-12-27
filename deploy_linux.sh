@@ -19,11 +19,15 @@ usage() {
 
 可选参数:
   --app-dir   安装目录（默认 /opt/edu-system）
-  --domain    Nginx server_name（默认 _）
+  --domain    Nginx server_name（可传多个，用空格分隔并加引号；默认自动探测本机主 IP/hostname）
+
+示例:
+  sudo ./deploy_linux.sh --domain "wangjiaqi.me 47.98.128.206"
 EOF
 }
 
-DOMAIN="_"
+# 为空表示未指定：后续会自动探测本机主 IP/hostname
+DOMAIN=""
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --app-dir)
@@ -39,6 +43,18 @@ while [[ $# -gt 0 ]]; do
       ;;
   esac
 done
+
+# 尽量避免 nginx `server_name _` 与系统默认站点冲突。
+# 若用户未显式传 --domain，则自动使用服务器主 IP（取不到则用 hostname）。
+if [[ -z "${DOMAIN}" ]]; then
+  if have_cmd hostname; then
+    DOMAIN="$(hostname -I 2>/dev/null | awk '{print $1}' || true)"
+    if [[ -z "${DOMAIN}" ]]; then
+      DOMAIN="$(hostname 2>/dev/null || true)"
+    fi
+  fi
+  DOMAIN="${DOMAIN:-_}"
+fi
 
 require_root() {
   if [[ "${EUID}" -ne 0 ]]; then
@@ -163,8 +179,11 @@ setup_python_venv() {
 build_frontend() {
   echo "[7/8] 构建前端（Vite dist）..."
   pushd "${APP_DIR}/frontend" >/dev/null
-  npm install
-  npm run build:no-check
+  # 说明：puppeteer 默认会在 npm install 阶段下载 Chromium。
+  # 部分服务器网络环境会导致下载失败（ECONNRESET），从而中断部署。
+  # 本项目运行时不依赖该浏览器文件，因此默认跳过下载以提高部署成功率。
+  PUPPETEER_SKIP_DOWNLOAD=1 npm install
+  PUPPETEER_SKIP_DOWNLOAD=1 npm run build:no-check
   popd >/dev/null
 }
 
@@ -268,8 +287,10 @@ EOF
   systemctl reload nginx
 
   echo "\n部署完成："
-  echo "- 后端健康检查:  curl -fsS http://127.0.0.1/api/health"
-  echo "- Socket.IO 状态: curl -fsS http://127.0.0.1/api/socketio/status"
+  echo "- Nginx server_name: ${DOMAIN}"
+  echo "- 直连后端健康检查:  curl -fsS http://127.0.0.1:${BACKEND_PORT}/api/health"
+  echo "- 直连后端 Socket.IO 状态: curl -fsS http://127.0.0.1:${BACKEND_PORT}/api/socketio/status"
+  echo "- 通过 Nginx 健康检查:     curl -fsS http://127.0.0.1/api/health"
   echo "- 打开浏览器访问:  http://<你的服务器IP>/"
   echo "\n常用命令："
   echo "- 查看后端日志: journalctl -u ${APP_NAME}-backend -f"

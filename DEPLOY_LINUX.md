@@ -17,6 +17,12 @@ chmod +x deploy_linux.sh
 sudo ./deploy_linux.sh --domain <你的域名或IP>
 ```
 
+如果你希望域名和服务器 IP 都能访问到同一套站点，可以一次写多个 `server_name`（用空格分隔并加引号）：
+
+```bash
+sudo ./deploy_linux.sh --domain "wangjiaqi.me 47.98.128.206"
+```
+
 默认会：
 
 - 安装系统依赖：`python3`、`nginx`、`nodejs` 等
@@ -87,3 +93,44 @@ systemctl reload nginx
 - `SECRET_KEY`：JWT/鉴权相关（脚本会自动生成）
 - `DASHSCOPE_API_KEY`：AI 功能用（没有也能启动）
 - `REDIS_*`：Redis 目前为可选（未部署也能启动）
+
+## 常见问题
+
+### npm install 报 puppeteer 下载 Chrome 失败（ECONNRESET）
+
+部分服务器网络环境会导致 puppeteer 在安装阶段下载 Chromium 失败，从而中断前端构建。
+
+解决（跳过下载）：
+
+```bash
+cd /opt/edu-system/frontend
+PUPPETEER_SKIP_DOWNLOAD=1 npm install
+PUPPETEER_SKIP_DOWNLOAD=1 npm run build:no-check
+```
+
+### /api/health 返回 404，但后端日志显示 8000 已启动
+
+如果你看到类似警告：`nginx: [warn] conflicting server name "_" on 0.0.0.0:80, ignored`，通常表示你的 Nginx 有多个 `server_name _;` 的站点配置冲突，导致本项目的 server 块被忽略，从而 `/api/*` 没有被反代到后端。
+
+排查：
+
+```bash
+# 直连后端（确认 FastAPI 正常）
+curl -fsS http://127.0.0.1:8000/api/health
+
+# 走 Nginx（确认反代正常）
+curl -fsS http://127.0.0.1/api/health
+```
+
+解决（推荐）：部署时指定你的域名或服务器 IP：
+
+```bash
+sudo ./deploy_linux.sh --domain <你的域名或服务器IP>
+```
+
+或手动修改 Nginx 配置 `server_name` 后重载：
+
+```bash
+nginx -t
+sudo systemctl reload nginx
+```
