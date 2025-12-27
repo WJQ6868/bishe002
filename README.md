@@ -1,2 +1,590 @@
-# bishe001
-bishi001
+# 高校智能教务系统 - 技术文档
+
+> **项目名称**: Smart University Academic Affairs System  
+> **版本**: 1.0  
+> **文档生成时间**: 2025-12-14
+
+---
+
+## 目录
+1. [项目概述](#项目概述)
+2. [技术栈](#技术栈)
+3. [后端架构](#后端架构)
+4. [前端架构](#前端架构)
+5. [功能模块清单](#功能模块清单)
+
+---
+
+## 项目概述
+
+高校智能教务系统是一个集成了基础教务管理和AI智能服务的全栈Web应用，采用前后端分离架构，支持学生、教师、管理员三种角色，覆盖选课、排课、成绩、考勤、请假、作业、即时通讯等核心功能。
+
+### 核心特性
+- ✅ 基于角色的权限控制（学生/教师/管理员）
+- ✅ 实时通讯系统（Socket.IO）
+- ✅ 智能排课算法（遗传算法）
+- ✅ 学情分析（KMeans聚类）
+- ✅ AI问答助手（大模型集成）
+- ✅ 完整的教务流程管理
+
+---
+
+## 技术栈
+
+### 后端技术
+| 技术 | 版本 | 用途 |
+|------|------|------|
+| **Python** | 3.11+ | 核心开发语言 |
+| **FastAPI** | - | Web框架，提供REST API |
+| **SQLAlchemy** | - | ORM框架，数据库操作 |
+| **SQLite** | - | 关系型数据库 |
+| **Socket.IO** | - | WebSocket实时通讯 |
+| **Uvicorn** | - | ASGI服务器 |
+| **Loguru** | - | 日志管理 |
+| **scikit-learn** | - | 机器学习（KMeans聚类）|
+
+### 前端技术
+| 技术 | 版本 | 用途 |
+|------|------|------|
+| **Vue 3** | 3.x | 前端框架 |
+| **TypeScript** | - | 类型安全 |
+| **Element Plus** | - | UI组件库 |
+| **Vue Router** | - | 路由管理 |
+| **Pinia** | - | 状态管理 |
+| **Axios** | - | HTTP请求 |
+| **Socket.IO Client** | - | WebSocket客户端 |
+| **Vite** | - | 构建工具 |
+
+---
+
+## 后端架构
+
+### 目录结构
+```
+backend/
+├── app/                      # 应用核心代码
+│   ├── models/              # 数据模型 (16个)
+│   ├── routers/             # API路由 (22个)
+│   ├── schemas/             # 数据验证模式 (13个)
+│   ├── services/            # 业务服务 (4个)
+│   ├── dependencies/        # 依赖注入 (3个)
+│   ├── algorithms/          # 算法模块 (2个)
+│   ├── utils/               # 工具函数 (3个)
+│   ├── main.py              # 应用入口
+│   ├── database.py          # 数据库配置
+│   └── config.py            # 应用配置
+├── static/                   # 静态文件
+├── logs/                     # 日志文件
+├── tests/                    # 测试代码
+├── edu_system.db            # SQLite数据库
+├── requirements.txt         # Python依赖
+└── start_backend.ps1        # 启动脚本
+```
+
+### 核心模块详解
+
+#### 1. Models (数据模型层) - `app/models/`
+
+| 文件名 | 功能描述 | 主要模型 |
+|--------|----------|----------|
+| `user.py` | 用户系统 | `User`, `UserProfile` - 用户基本信息和详细资料 |
+| `student.py` | 学生模块 | `Student`, `StudentProfile` - 学生信息扩展 |
+| `admin.py` | 管理员模块 | `Admin` - 管理员信息 |
+| `course.py` | 课程管理 | `Course`, `CourseSelection` - 课程和选课关系 |
+| `schedule.py` | 课表管理 | `Schedule`, `Classroom` - 课程表和教室 |
+| `teaching.py` | 教学管理 | `TeachingPlan`, `TeachingMaterial` - 教学计划和教材 |
+| `academic.py` | 学术管理 | `Grade`, `Exam` - 成绩和考试 |
+| `message.py` | 消息系统 | `Message`, `UserStatus` - 聊天消息和在线状态 |
+| `friend.py` | 好友系统 | `FriendRequest`, `Friendship` - 好友申请和关系 |
+| `service.py` | 办事大厅 | `Service`, `ServiceApply` - 服务项目和申请 |
+| `leave.py` | 请假管理 | `LeaveRequest` - 请假申请记录 |
+| `cert.py` | 证书管理 | `Certificate`, `CertCollection` - 证书和收藏 |
+| `calendar.py` | 校历管理 | `CalendarEvent` - 校历事件 |
+| `quick_link.py` | 快捷链接 | `QuickLink` - 首页快捷入口 |
+| `frontend_log.py` | 前端日志 | `FrontendLog` - 前端错误日志 |
+
+**数据模型设计要点**:
+- 所有模型继承自 `Base` (SQLAlchemy声明式基类)
+- 使用 `AsyncSession` 支持异步数据库操作
+- 外键关联使用表名而非模型名 (如 `sys_users.id`)
+- 时间字段统一使用 `DateTime`，默认 `func.now()`
+
+#### 2. Routers (API路由层) - `app/routers/`
+
+| 文件名 | 路由前缀 | 功能描述 | 主要端点 |
+|--------|----------|----------|----------|
+| `auth.py` | `/token`, `/auth` | 认证授权 | POST `/token` 登录<br>GET `/auth/me` 获取当前用户 |
+| `user.py` | `/api/users` | 用户管理 | CRUD用户，重置密码 |
+| `course.py` | `/api/courses` | 课程管理 | 课程CRUD，选课/退课，课程列表 |
+| `schedule.py` | `/api/schedules` | 课表管理 | 获取课表，教室管理，排课冲突检测 |
+| `academic.py` | `/api/grades`, `/api/exams` | 成绩考试 | 成绩录入/查询，考试管理 |
+| `attendance.py` | `/api/attendance` | 考勤管理 | 签到/签退，考勤记录查询 |
+| `homework.py` | `/api/homework` | 作业管理 | 作业发布/提交/批改 |
+| `leave.py` | `/api/leave` | 请假管理 | 请假申请/审批，历史记录 |
+| `message.py` | `/api/chat` | 即时通讯 | 发送消息，聊天历史，联系人列表 |
+| `friend.py` | `/api/friend` | 好友管理 | 添加好友，处理申请，好友列表 |
+| `service.py` | `/api/services` | 办事大厅 | 服务列表，申请提交，审批 |
+| `cert.py` | `/api/cert` | 证书管理 | 证书CRUD，收藏管理，链接跳转 |
+| `calendar.py` | `/api/calendar` | 校历管理 | 校历事件CRUD，事件查询 |
+| `dashboard.py` | `/api/dashboard` | 仪表盘 | 统计数据，快捷操作 |
+| `analysis.py` | `/api/analysis` | 数据分析 | 学情分析，预警名单，聚类结果 |
+| `ai_qa.py` | `/api/ai` | AI问答 | 智能问答，流式响应 |
+| `quick_link.py` | `/api/quick-links` | 快捷链接 | 快捷入口CRUD |
+| `work.py` | `/api/work` | 工作安排 | 教师工作安排管理 |
+| `classroom.py` | `/api/classrooms` | 教室管理 | 教室CRUD，预约管理 |
+| `data_sync.py` | `/api/sync` | 数据同步 | 系统数据同步接口 |
+| `log.py` | `/api/logs` | 日志管理 | 前端日志上报 |
+
+**API设计规范**:
+- 遵循RESTful风格
+- 统一返回格式: `{"code": 200, "message": "success", "data": {...}}`
+- 使用依赖注入: `Depends(get_db)`, `Depends(get_current_user)`
+- 错误处理: 抛出 `HTTPException` 并记录日志
+- 权限控制: 通过 `dependencies.permissions` 检查
+
+#### 3. Services (业务服务层) - `app/services/`
+
+| 文件名 | 功能描述 |
+|--------|----------|
+| `socket_manager.py` | **Socket.IO管理** - WebSocket连接管理，在线状态维护，实时消息推送 |
+| `ai_service.py` | **AI服务** - 大模型对接，流式响应，智能问答 |
+| `analysis_service.py` | **数据分析服务** - KMeans聚类，学情预警，成绩统计 |
+| `schedule_algorithm.py` | **排课算法** - 遗传算法自动排课，冲突检测优化 |
+
+**Socket.IO事件清单**:
+- `connect` / `disconnect` - 连接管理
+- `user_login` - 用户登录，更新在线状态
+- `send_message` - 发送消息
+- `new_message` - 接收新消息
+- `user_status_change` - 用户状态变化
+- `friend_request_received` - 收到好友申请
+- `friend_added` - 好友添加成功
+- `friend_deleted` - 好友删除
+
+#### 4. Dependencies (依赖注入) - `app/dependencies/`
+
+| 文件名 | 功能 |
+|--------|------|
+| `auth.py` | JWT令牌生成/验证，密码哈希，获取当前用户 |
+| `permissions.py` | 权限检查 - 聊天权限，好友关系，师生关系验证 |
+| `validators.py` | 数据验证工具函数 |
+
+#### 5. Schemas (数据验证) - `app/schemas/`
+
+使用 Pydantic 定义请求/响应模型，提供自动数据验证和文档生成：
+- `user.py` - 用户相关DTO
+- `course.py` - 课程相关DTO
+- `friend.py` - 好友相关DTO
+- 等13个schema文件，对应各功能模块
+
+#### 6. Algorithms (算法模块) - `app/algorithms/`
+
+| 文件名 | 算法描述 |
+|--------|----------|
+| `schedule_ga.py` | **遗传算法排课** - 基于时间槽、教室、冲突约束的智能排课 |
+| `kmeans_analysis.py` | **KMeans聚类分析** - 基于成绩数据的学生学情分类 |
+
+#### 7. Utils (工具函数) - `app/utils/`
+
+| 文件名 | 功能 |
+|--------|------|
+| `response.py` | 统一响应格式封装 |
+| `excel_utils.py` | Excel导入导出 |
+| `date_utils.py` | 日期时间处理 |
+
+#### 8. 核心配置文件
+
+| 文件名 | 用途 |
+|--------|------|
+| `main.py` | FastAPI应用入口，路由注册，CORS配置，Socket.IO挂载 |
+| `database.py` | SQLAlchemy配置，异步会话管理，数据库引擎 |
+| `config.py` | 应用配置 - JWT密钥，数据库URL，环境变量 |
+| `logging_config.py` | Loguru日志配置 - 文件轮转，日志级别 |
+
+### 数据库初始化脚本
+
+| 文件名 | 功能 |
+|--------|------|
+| `init_db_data.py` | 初始化用户、课程、班级等基础数据 |
+| `init_user_tables.sql` | 创建用户相关表结构 |
+| `init_chat_db.sql` | 创建聊天消息表 |
+| `init_friend_db.sql` | 创建好友关系表 |
+| `init_leave_db.sql` | 创建请假申请表 |
+| `create_*.py` | 各种表索引创建脚本 |
+
+---
+
+## 前端架构
+
+### 目录结构
+```
+frontend/src/
+├── views/                    # 页面视图 (58个)
+│   ├── student/             # 学生端页面 (8个)
+│   ├── teacher/             # 教师端页面 (8个)
+│   ├── admin/               # 管理员页面 (3个)
+│   ├── service/             # 办事大厅页面 (3个)
+│   ├── cert/                # 证书页面 (2个)
+│   └── material/            # 素材页面 (20+)
+├── components/              # 公共组件 (4个)
+├── api/                     # API封装 (3个)
+├── router/                  # 路由配置
+├── stores/                  # Pinia状态管理 (2个)
+├── composables/             # 组合式函数 (3个)
+├── layouts/                 # 布局组件
+├── plugins/                 # 插件配置
+├── utils/                   # 工具函数 (2个)
+├── styles/                  # 全局样式
+├── App.vue                  # 根组件
+└── main.ts                  # 应用入口
+```
+
+### 核心页面组件 - `views/`
+
+#### 公共页面
+| 文件名 | 路由路径 | 功能描述 |
+|--------|----------|----------|
+| `Login.vue` | `/login` | 登录页面 - 支持学生/教师/管理员角色切换，账号格式验证 |
+| `Dashboard.vue` | `/dashboard` | 首页仪表盘 - 数据统计，快捷操作，待办事项 |
+| `Layout.vue` | `/` | 主布局框架 - 侧边栏导航，头部用户信息，路由出口 |
+| `InstantMessage.vue` | `/instant-message` | 即时通讯 - 好友列表，聊天窗口，表情选择器，Socket.IO |
+| `Schedule.vue` | `/schedule` | 课程表 - 周视图，时间槽，课程详情 |
+| `Calendar.vue` | `/calendar` | 校历 - 月视图，事件标记，事件详情 |
+| `SystemConfig.vue` | `/system-config` | 系统配置 - 系统名称，登录背景，主题设置 |
+
+#### 学生端页面 - `student/`
+| 文件名 | 路由路径 | 功能描述 |
+|--------|----------|----------|
+| `CourseSelect.vue` | `/student/course-select` | 选课 - 课程检索，选课/退课，已选课程 |
+| `CourseManagement.vue` | `/student/course-management` | 我的课程 - 已选课程列表，课程资料 |
+| `GradeManagement.vue` | `/student/grade-management` | 成绩查询 - 成绩列表，学期筛选，GPA统计 |
+| `Attendance.vue` | `/student/attendance` | 考勤记录 - 签到历史，缺勤统计 |
+| `Homework.vue` | `/student/homework` | 作业管理 - 待提交作业，已提交作业，作业详情 |
+| `Leave.vue` | `/student/leave` | 请假申请 - 新建申请，审批状态，历史记录 |
+
+#### 教师端页面 - `teacher/`
+| 文件名 | 路由路径 | 功能描述 |
+|--------|----------|----------|
+| `GradeManagement.vue` | `/teacher/grade-management` | 成绩录入 - 按课程录入成绩，批量导入 |
+| `Attendance.vue` | `/teacher/attendance` | 考勤管理 - 课堂签到，考勤统计 |
+| `Homework.vue` | `/teacher/homework` | 作业管理 - 发布作业，批改作业，作业统计 |
+| `LeaveApproval.vue` | `/teacher/leave-approval` | 请假审批 - 待审批列表，审批操作 |
+| `WorkSchedule.vue` | `/teacher/work-schedule` | 工作安排 - 教学计划，工作日程 |
+
+#### 管理员页面 - `admin/`
+| 文件名 | 路由路径 | 功能描述 |
+|--------|----------|----------|
+| `UserManagement.vue` | `/admin/user-management` | 用户管理 - 学生/教师/管理员CRUD，重置密码 |
+| `ClassAdjust.vue` | `/admin/class-adjust` | 班级调整 - 学生转班，班级管理 |
+| `ServiceApproval.vue` | `/admin/service-approval` | 服务审批 - 办事大厅申请审批 |
+
+#### 办事大厅 - `service/`
+| 文件名 | 路由路径 | 功能描述 |
+|--------|----------|----------|
+| `ServiceHall.vue` | `/service-hall` | 办事大厅首页 - 服务分类，快捷链接，服务列表 |
+| `ServiceDetail.vue` | `/service/:id` | 服务详情 - 服务说明，申请表单 |
+| `MyApplications.vue` | `/service/my-applications` | 我的申请 - 申请历史，审批进度 |
+
+#### 证书管理 - `cert/`
+| 文件名 | 路由路径 | 功能描述 |
+|--------|----------|----------|
+| `CertLinks.vue` | `/cert-links` | 证书链接 - 常用证书链接，一键跳转 |
+| `MyCollections.vue` | `/cert/my-collections` | 我的收藏 - 收藏的证书链接 |
+
+#### 其他页面
+| 文件名 | 功能描述 |
+|--------|----------|
+| `AIConfig.vue` | AI配置 - 配置AI模型参数 |
+| `Analysis.vue` | 数据分析 - 学情分析，预警列表 |
+| `RequirementsAnalysis.vue` | 需求分析文档页面 |
+| `SystemArchitecture.vue` | 系统架构文档页面 |
+| `ReservationAudit.vue` | 预约审核 |
+| `ResourceManagement.vue` | 资源管理 |
+
+### 公共组件 - `components/`
+
+| 组件名 | 功能描述 |
+|--------|----------|
+| `FriendManagement.vue` | **好友管理组件** - 添加好友(搜索用户)，好友申请(接收/发送)，好友列表，集成到即时通讯 |
+| `StudentAIChat.vue` | **学生AI聊天** - AI问答助手，流式对话，历史记录 |
+| `TeacherAIChat.vue` | **教师AI聊天** - 教学辅助AI，智能备课建议 |
+| `ThemeSwitcher.vue` | **主题切换器** - 亮色/暗色主题切换 |
+
+### API封装 - `api/`
+
+| 文件名 | 功能 |
+|--------|------|
+| `index.ts` | Axios配置 - 请求拦截器(添加token)，响应拦截器(统一错误处理) |
+| `api.ts` | 通用API方法 - 基础CRUD操作封装 |
+| `friend.ts` | 好友API - 搜索用户，发送申请，处理申请，好友列表，删除好友 |
+
+### 路由配置 - `router/index.ts`
+
+```typescript
+// 路由守卫配置
+- 登录验证
+- 角色权限检查
+- 动态路由加载
+```
+
+**主要路由规则**:
+- `/login` - 登录页（无需认证）
+- `/` - 主布局（需认证）
+  - `/dashboard` - 首页
+  - `/student/*` - 学生端路由（需student角色）
+  - `/teacher/*` - 教师端路由（需teacher角色）
+  - `/admin/*` - 管理员路由（需admin角色）
+
+### 状态管理 - `stores/`
+
+| Store | 功能 |
+|-------|------|
+| `user.ts` | 用户状态 - 当前用户信息，权限，登录状态 |
+| `app.ts` | 应用状态 - 主题，侧边栏折叠，系统配置 |
+
+### 工具函数 - `utils/`
+
+| 文件名 | 功能 |
+|--------|------|
+| `request.ts` | HTTP请求封装 - 统一错误处理 |
+| `format.ts` | 数据格式化 - 日期、数字、文本处理 |
+
+---
+
+## 功能模块清单
+
+### 1. 认证授权模块
+- ✅ 登录/登出
+- ✅ JWT令牌认证
+- ✅ 基于角色的访问控制(RBAC)
+- ✅ 账号格式验证（学生8位2开头，教师6位1开头，管理员6位8开头）
+- ✅ 密码重置
+
+### 2. 用户管理模块
+- ✅ 学生/教师/管理员CRUD
+- ✅ 用户资料管理
+- ✅ 密码修改
+- ✅ 批量导入/导出
+
+### 3. 课程管理模块
+- ✅ 课程CRUD
+- ✅ 选课/退课
+- ✅ 课程容量管理
+- ✅ 课程检索与筛选
+- ✅ 选课冲突检测
+
+### 4. 排课与课表模块
+- ✅ 自动排课（遗传算法）
+- ✅ 手动调课
+- ✅ 课表查询（学生/教师）
+- ✅ 教室管理
+- ✅ 时间冲突检测
+
+### 5. 成绩管理模块
+- ✅ 成绩录入/修改
+- ✅ 成绩查询
+- ✅ GPA计算
+- ✅ 成绩统计分析
+- ✅ 成绩导出
+
+### 6. 考勤管理模块
+- ✅ 课堂签到/签退
+- ✅ 考勤记录查询
+- ✅ 缺勤统计
+- ✅ 考勤报表
+
+### 7. 作业管理模块
+- ✅ 作业发布
+- ✅ 作业提交
+- ✅ 作业批改
+- ✅ 作业统计
+- ✅ 文件上传/下载
+
+### 8. 请假管理模块
+- ✅ 请假申请
+- ✅ 请假审批（教师）
+- ✅ 审批流程跟踪
+- ✅ 请假历史记录
+
+### 9. 即时通讯模块
+- ✅ 实时聊天（Socket.IO）
+- ✅ 好友管理（添加/删除/搜索）
+- ✅ 好友申请与审批
+- ✅ 在线状态显示
+- ✅ 未读消息提醒
+- ✅ 聊天记录
+- ✅ 表情选择器（80+emoji）
+- ✅ 权限控制（好友或师生关系）
+
+### 10. 办事大厅模块
+- ✅ 服务分类展示
+- ✅ 服务申请
+- ✅ 审批流程
+- ✅ 申请历史
+- ✅ 快捷链接
+
+### 11. 证书管理模块
+- ✅ 证书链接管理
+- ✅ 证书收藏
+- ✅ 一键跳转
+- ✅ 分类管理
+
+### 12. 数据分析模块
+- ✅ 学情分析（KMeans聚类）
+- ✅ 学习预警
+- ✅ 成绩分布统计
+- ✅ 可视化报表
+
+### 13. AI智能助手模块
+- ✅ 智能问答
+- ✅ 流式对话
+- ✅ 上下文记忆
+- ✅ 角色化对话（学生/教师）
+
+### 14. 系统管理模块
+- ✅ 系统配置（名称、Logo、背景）
+- ✅ 主题切换（亮/暗）
+- ✅ 校历管理
+- ✅ 日志记录
+- ✅ 数据同步
+
+---
+
+## 数据库设计
+
+### 核心数据表
+
+| 表名 | 说明 | 关键字段 |
+|------|------|----------|
+| `sys_users` | 用户表 | id, username, password, role, is_active |
+| `user_profiles` | 用户资料 | user_id, name, dept, grade, entry_time |
+| `students` | 学生信息 | id, student_number, class_id |
+| `teachers` | 教师信息 | id, teacher_number, title |
+| `admins` | 管理员 | id, username, password |
+| `courses` | 课程表 | id, name, code, credit, teacher_id |
+| `course_selections` | 选课记录 | id, student_id, course_id, status |
+| `schedules` | 课表 | id, course_id, weekday, time_slot, classroom |
+| `grades` | 成绩表 | id, student_id, course_id, score, gpa |
+| `messages` | 聊天消息 | id, from_id, to_id, content, send_time |
+| `friend_request` | 好友申请 | id, from_user_id, to_user_id, status |
+| `friendship` | 好友关系 | id, user_id_1, user_id_2 |
+| `leave_requests` | 请假申请 | id, student_id, start_date, end_date, status |
+| `service_apply` | 服务申请 | id, user_id, service_id, status |
+| `certificates` | 证书 | id, name, url, category |
+
+### 数据库关系
+- 一对多：User → CourseSelection, User → Message
+- 多对多：Student ↔ Course (通过course_selections)
+- 一对一：User ↔ UserProfile
+- 自关联：User ↔ User (通过friendship)
+
+---
+
+## 部署说明
+
+### 后端部署
+```powershell
+# 1. 安装依赖
+pip install -r requirements.txt
+
+# 2. 初始化数据库
+python init_db_data.py
+
+# 3. 启动服务
+.\start_backend.ps1
+# 或
+uvicorn app.main:socket_app --host 0.0.0.0 --port 8000 --reload
+```
+
+### 前端部署
+```bash
+# 1. 安装依赖
+npm install
+
+# 2. 开发运行
+npm run dev
+
+# 3. 生产构建
+npm run build
+```
+
+### 前端开发环境 vs 生产环境 (重要说明)
+
+在 Linux 服务器部署时，前端必须通过 `npm run build` 进行生产环境构建，而不是直接运行源代码。
+
+| 特性 | 开发环境 (`npm run dev`) | 生产环境 (`npm run build`) |
+| :--- | :--- | :--- |
+| **用途** | 本地开发、实时调试 | Linux 服务器正式上线 |
+| **文件格式** | `.vue`, `.ts` 源代码 | 压缩后的 `.js`, `.css` 静态文件 |
+| **运行依赖** | 必须安装 Node.js + node_modules | 仅需 Nginx (无需 Node.js) |
+| **加载性能** | 较慢 (文件多且碎，未压缩) | 极快 (高度压缩、合并、混淆) |
+| **稳定性** | 一般 (开发服务器可能挂掉) | 极高 (由工业级 Nginx 提供服务) |
+
+**为什么要打包？**
+1. **浏览器兼容性**：浏览器无法直接识别 `.vue` 文件，打包过程将其转换为标准 JS/CSS。
+2. **性能优化**：通过压缩和合并文件，极大减少网络传输量和请求次数。
+3. **安全性**：混淆后的代码更难被反编译，且生产环境不暴露源代码结构。
+4. **资源节省**：生产环境运行不需要 Node.js 进程，极大节省服务器 CPU 和内存。
+
+### 访问地址
+- 前端: http://localhost:2003
+- 后端API: http://localhost:8000
+- API文档: http://localhost:8000/docs
+
+---
+
+## 测试账号
+
+| 角色 | 账号 | 密码 | 说明 |
+|------|------|------|------|
+| 学生 | 20230001 | 123456 | 8位数字，2开头 |
+| 教师 | 100001 | 123456 | 6位数字，1开头 |
+| 管理员 | 800001 | 123456 | 6位数字，8开头 |
+
+---
+
+## 技术亮点
+
+1. **前后端分离架构** - FastAPI + Vue 3，清晰的职责划分
+2. **实时通讯** - Socket.IO实现WebSocket双向通信
+3. **智能算法** - 遗传算法排课 + KMeans学情分析
+4. **类型安全** - TypeScript + Pydantic，编译时错误检查
+5. **异步高性能** - AsyncIO + SQLAlchemy异步ORM
+6. **现代化UI** - Element Plus + 响应式设计
+7. **角色权限** - 基于JWT的RBAC权限系统
+8. **可扩展性** - 模块化设计，易于扩展新功能
+
+---
+
+## 开发规范
+
+### 后端编码规范
+- 遵循PEP 8
+- 使用类型注解
+- API路由分组清晰
+- 统一错误处理
+- 日志记录完整
+
+### 前端编码规范
+- Vue 3 Composition API
+- TypeScript类型约束
+- 组件化开发
+- 统一代码风格（Prettier）
+- 路由懒加载
+
+---
+
+## 未来规划
+
+- [ ] 移动端适配（响应式优化）
+- [ ] 微服务拆分
+- [ ] Redis缓存
+- [ ] 消息队列（Celery）
+- [ ] 文件存储服务（OSS）
+- [ ] 更多AI功能（智能推荐、自动评分）
+- [ ] 数据可视化大屏
+- [ ] 单点登录（SSO）
+
+---
+
+**文档维护**: 本文档由AI自动生成，需随代码更新同步维护。
