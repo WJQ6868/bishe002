@@ -14,15 +14,17 @@ interface BaseResource {
   remark?: string
 }
 
-interface ClassroomForm {
-  id: number
-  code: string
-  name: string
-  capacity: number
-  location: string
-  devices: string[]
-  status: ResourceStatus
-  remark: string
+interface ResourceForm extends BaseResource {
+  capacity?: number
+  location?: string
+  devices?: string[]
+  type?: string
+  manager?: string
+  safetyRequirements?: string
+  resourceId?: number
+  resourceName?: string
+  purchaseTime?: string
+  spec?: string
 }
 
 interface Lab extends BaseResource {
@@ -62,7 +64,7 @@ const reservationDialogVisible = ref(false)
 const currentReservations = ref<Reservation[]>([])
 const isClassroomTab = computed(() => activeTab.value === 'classroom')
 
-const emptyForm = (): ClassroomForm => ({
+const emptyForm = (): ResourceForm => ({
   id: 0,
   code: '',
   name: '',
@@ -72,7 +74,7 @@ const emptyForm = (): ClassroomForm => ({
   status: 'idle',
   remark: ''
 })
-const form = reactive<ClassroomForm>(emptyForm())
+const form = reactive<ResourceForm>(emptyForm())
 
 const tableData = computed(() => {
   let data: any[] = []
@@ -98,29 +100,19 @@ const statistics = computed(() => {
   const idle = data.filter(i => i.status === 'idle').length
   const maintenance = data.filter(i => i.status === 'maintenance').length
   const scrapped = data.filter(i => i.status === 'scrapped').length
+  
   const utilization = total > 0 ? Math.round((inUse / total) * 100) : 0
+  
   return { total, inUse, idle, maintenance, scrapped, utilization }
 })
-
-const getStatusTag = (status: ResourceStatus) => {
-  const map: Record<string, { label: string, type: string }> = {
-    in_use: { label: '在用', type: 'success' },
-    idle: { label: '空闲', type: 'info' },
-    maintenance: { label: '维护', type: 'warning' },
-    scrapped: { label: '报废', type: 'danger' },
-    normal: { label: '正常', type: 'success' }
-  }
-  return map[status] || { label: status, type: 'info' }
-}
 
 const loadClassrooms = async () => {
   loading.value = true
   try {
-    classrooms.value = await classroomApi.list()
-  } catch (error: any) {
-    const detail = error?.response?.data?.detail || '加载教室数据失败'
-    ElMessage.error(detail)
-    classrooms.value = []
+    const data = await classroomApi.list()
+    classrooms.value = data
+  } catch (error) {
+    ElMessage.error('获取教室列表失败')
   } finally {
     loading.value = false
   }
@@ -128,10 +120,30 @@ const loadClassrooms = async () => {
 
 onMounted(() => {
   loadClassrooms()
+  // Mock labs and equipment
+  labs.value = [
+    { id: 101, code: 'LAB-001', name: '人工智能实验室', type: '计算机', capacity: 30, manager: '张老师', status: 'in_use' },
+    { id: 102, code: 'LAB-002', name: '物理实验中心', type: '物理', capacity: 25, manager: '李老师', status: 'idle' }
+  ]
+  equipment.value = [
+    { id: 201, code: 'EQ-001', name: '激光投影仪', type: '投影仪', resourceName: '101教室', purchaseTime: '2023-01-15', status: 'normal' },
+    { id: 202, code: 'EQ-002', name: '高配工作站', type: '电脑', resourceName: 'AI实验室', purchaseTime: '2023-03-10', status: 'maintenance' }
+  ]
 })
 
+const getStatusTag = (status: ResourceStatus) => {
+  const map: Record<ResourceStatus, { label: string, type: string }> = {
+    in_use: { label: '在用', type: 'success' },
+    idle: { label: '空闲', type: 'info' },
+    maintenance: { label: '维修', type: 'warning' },
+    scrapped: { label: '报废', type: 'danger' },
+    normal: { label: '正常', type: 'success' }
+  }
+  return map[status] || { label: status, type: 'info' }
+}
+
 const requireClassroomTab = (action: string) => {
-  if (!isClassroomTab.value) {
+  if (activeTab.value !== 'classroom') {
     ElMessage.info(`当前仅支持教室资源${action}`)
     return false
   }
@@ -171,7 +183,7 @@ const handleEdit = (row: ClassroomResponse) => {
 }
 
 const buildPayload = (): ClassroomPayload => {
-  const trimmedName = form.name.trim()
+  const trimmedName = form.name?.trim() || ''
   if (!trimmedName) {
     throw new Error('请填写教室名称')
   }
@@ -182,12 +194,12 @@ const buildPayload = (): ClassroomPayload => {
   return {
     name: trimmedName,
     capacity,
-    is_multimedia: form.devices.includes('多媒体'),
-    code: form.code.trim() || undefined,
-    location: form.location.trim() || undefined,
-    devices: [...form.devices],
-    status: form.status,
-    remark: form.remark.trim() || undefined
+    is_multimedia: form.devices?.includes('多媒体') || false,
+    code: form.code?.trim() || undefined,
+    location: form.location?.trim() || undefined,
+    devices: [...(form.devices || [])],
+    status: form.status || 'idle',
+    remark: form.remark?.trim() || undefined
   }
 }
 
@@ -327,7 +339,6 @@ const handleExport = () => {
           <div class="stat-item primary" v-if="activeTab === 'classroom'">
             <div class="label">利用率</div>
             <div class="value">{{ statistics.utilization }}%</div>
-            <!-- 教室利用率=在用数量/总数量×100% -->
           </div>
         </div>
       </el-card>
@@ -335,7 +346,7 @@ const handleExport = () => {
 
     <!-- 资源列表 -->
     <el-card class="table-card" shadow="never">
-      <el-table :data="tableData" v-loading="loading || tableLoading" style="width: 100%" height="100%">
+      <el-table :data="tableData" v-loading="loading" style="width: 100%" height="100%">
         <el-table-column prop="code" label="编号" width="120" fixed />
         <el-table-column prop="name" label="名称" min-width="150" show-overflow-tooltip />
         
@@ -367,7 +378,7 @@ const handleExport = () => {
         <el-table-column label="操作" width="250" fixed="right">
           <template #default="{ row }">
             <el-button link type="primary" :icon="Edit" @click="handleEdit(row)">编辑</el-button>
-            <el-button link type="primary" :icon="View" @click="handleViewReservations(row)">查看预约</el-button>
+            <el-button link type="primary" :icon="View" @click="handleViewReservations()">查看预约</el-button>
             
             <el-dropdown style="margin-left: 10px" @command="(cmd: any) => handleStatusChange(row, cmd)">
               <el-button link type="warning" :icon="Tools">状态管理</el-button>
@@ -489,10 +500,12 @@ const handleExport = () => {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  background: #fff;
+  background: var(--card-bg);
+  backdrop-filter: blur(10px);
   padding: 10px 20px;
   border-radius: 4px;
-  box-shadow: 0 1px 4px rgba(0,0,0,0.05);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+  border: 1px solid var(--border-color);
 }
 .resource-tabs {
   flex: 1;
@@ -520,16 +533,16 @@ const handleExport = () => {
 }
 .stat-item .label {
   font-size: 12px;
-  color: #909399;
+  color: rgba(255, 255, 255, 0.6);
   margin-bottom: 5px;
 }
 .stat-item .value {
   font-size: 24px;
   font-weight: bold;
-  color: #303133;
+  color: #fff;
 }
 .stat-item.success .value { color: #67C23A; }
-.stat-item.info .value { color: #909399; }
+.stat-item.info .value { color: rgba(255, 255, 255, 0.6); }
 .stat-item.warning .value { color: #E6A23C; }
 .stat-item.danger .value { color: #F56C6C; }
 .stat-item.primary .value { color: #409EFF; }
@@ -546,6 +559,6 @@ const handleExport = () => {
 }
 /* 表格hover行背景 */
 :deep(.el-table__body tr:hover > td) {
-  background-color: #FFF7E6 !important;
+  background-color: rgba(255, 255, 255, 0.05) !important;
 }
 </style>

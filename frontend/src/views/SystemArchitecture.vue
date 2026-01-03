@@ -219,7 +219,7 @@ const downloadChart = () => {
   const url = myChart.getDataURL({
     type: 'png',
     pixelRatio: 2,
-    backgroundColor: '#fff'
+    backgroundColor: '#050505'
   })
   const a = document.createElement('a')
   a.download = 'architecture-diagram.png'
@@ -289,15 +289,17 @@ const downloadChart = () => {
 <style scoped>
 .architecture-page {
   min-height: 100vh;
-  background-color: #f5f7fa;
+  background-color: transparent;
   display: flex;
   flex-direction: column;
 }
 
 .page-header {
-  background: #fff;
+  background: var(--card-bg);
+  backdrop-filter: blur(10px);
   padding: 20px 40px;
-  box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.05);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+  border-bottom: 1px solid var(--border-color);
   text-align: center;
   position: relative;
 }
@@ -316,7 +318,7 @@ const downloadChart = () => {
 .page-header h1 {
   margin: 0;
   font-size: 28px;
-  color: #303133;
+  color: var(--el-text-color-primary);
 }
 .subtitle {
   margin: 10px 0 0;
@@ -336,7 +338,9 @@ const downloadChart = () => {
 }
 
 .arch-tabs {
-  background: #fff;
+  background: var(--card-bg);
+  backdrop-filter: blur(10px);
+  border: 1px solid var(--border-color);
   min-height: 600px;
   display: flex;
   flex-direction: column;
@@ -360,8 +364,9 @@ const downloadChart = () => {
   align-items: center;
   margin-bottom: 20px;
   padding: 10px;
-  background: #f5f7fa;
+  background: rgba(255, 255, 255, 0.03);
   border-radius: 4px;
+  border: 1px solid var(--border-color);
 }
 
 .echarts-box {

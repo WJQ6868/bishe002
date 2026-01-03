@@ -420,10 +420,11 @@ onMounted(() => {
 <style scoped>
 .calendar-container {
   padding: 20px;
-  background-color: var(--el-bg-color-overlay);
+  background-color: var(--card-bg);
+  backdrop-filter: blur(10px);
   border-radius: 12px;
-  border: 1px solid var(--el-border-color-lighter);
-  box-shadow: var(--el-box-shadow-light);
+  border: 1px solid var(--border-color);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
   display: flex;
   flex-direction: column;
   min-height: 100%;
@@ -437,12 +438,8 @@ onMounted(() => {
   margin-bottom: 20px;
   padding: 14px 14px;
   border-radius: 12px;
-  background: linear-gradient(
-    180deg,
-    var(--el-color-primary-light-9) 0%,
-    var(--el-bg-color-overlay) 65%
-  );
-  border: 1px solid var(--el-border-color-lighter);
+  background: rgba(0, 242, 254, 0.05);
+  border: 1px solid var(--border-color);
 }
 
 .title-wrap {
@@ -501,10 +498,11 @@ onMounted(() => {
 }
 
 .month-card {
-  background: var(--el-bg-color-overlay);
-  border: 1px solid var(--el-border-color-lighter);
+  background: var(--card-bg);
+  backdrop-filter: blur(10px);
+  border: 1px solid var(--border-color);
   border-radius: 12px;
-  box-shadow: var(--el-box-shadow-light);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
   padding: 12px;
 }
 
@@ -531,8 +529,8 @@ onMounted(() => {
   gap: 4px;
   padding: 6px;
   border-radius: 10px;
-  background: var(--el-fill-color-light);
-  border: 1px solid var(--el-border-color-lighter);
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--border-color);
 }
 
 .mini-weekday {
@@ -549,8 +547,8 @@ onMounted(() => {
   grid-template-columns: repeat(7, minmax(0, 1fr));
   gap: 4px;
   border-radius: 10px;
-  background: var(--el-fill-color-light);
-  border: 1px solid var(--el-border-color-lighter);
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--border-color);
 }
 
 .mini-day {
@@ -562,8 +560,8 @@ onMounted(() => {
   border-radius: 8px;
   cursor: pointer;
   color: var(--el-text-color-primary);
-  background: var(--el-bg-color-overlay);
-  border: 1px solid var(--el-border-color-lighter);
+  background: transparent;
+  border: 1px solid transparent;
   transition: transform 0.15s ease, box-shadow 0.15s ease, background-color 0.15s ease;
   user-select: none;
 }
@@ -695,8 +693,8 @@ onMounted(() => {
 :deep(.el-calendar__header) {
   padding: 10px 12px;
   border-radius: 12px;
-  border: 1px solid var(--el-border-color-lighter);
-  background: var(--el-bg-color-overlay);
+  border: 1px solid var(--border-color);
+  background: rgba(255, 255, 255, 0.03);
   margin-bottom: 12px;
 }
 
@@ -717,7 +715,7 @@ onMounted(() => {
 :deep(.el-calendar-table th) {
   color: var(--el-text-color-secondary);
   font-weight: 600;
-  background: var(--el-fill-color-light);
+  background: rgba(255, 255, 255, 0.03);
 }
 
 :deep(.el-calendar-table td .el-calendar-day) {

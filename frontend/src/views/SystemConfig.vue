@@ -6,7 +6,6 @@ import { Setting, Check, RefreshLeft } from '@element-plus/icons-vue'
 // --- 1. 类型定义 ---
 interface BaseConfig {
   systemName: string
-  loginBg: string
   sessionTimeout: number
   defaultPwd: string
 }
@@ -44,7 +43,6 @@ interface SystemConfig {
 const defaultConfig: SystemConfig = {
   base: {
     systemName: '高校智能教务系统',
-    loginBg: 'bg1',
     sessionTimeout: 30,
     defaultPwd: '123456'
   },
@@ -76,14 +74,9 @@ const originalConfig = ref<SystemConfig>(JSON.parse(JSON.stringify(defaultConfig
 const dirtyTabs = ref<Set<string>>(new Set())
 
 // 背景图选项
-const bgOptions = [
-  { value: 'bg1', label: '背景1', preview: 'https://picsum.photos/300/200?random=1' },
-  { value: 'bg2', label: '背景2', preview: 'https://picsum.photos/300/200?random=2' },
-  { value: 'bg3', label: '背景3', preview: 'https://picsum.photos/300/200?random=3' }
-]
 
-// 大模型选项
-const aiProviders = ['通义千问', 'DeepSeek', '讯飞星火']
+// 大模型选项（当前项目实际接入并可用）
+const aiProviders = ['通义千问']
 
 // 时间范围选项
 const timeRangeOptions = [
@@ -168,11 +161,6 @@ const beforeTabChange = (tab: string) => {
 // 是否有未保存的配置
 const hasUnsavedChanges = computed(() => dirtyTabs.value.size > 0)
 
-// 当前背景图预览
-const currentBgPreview = computed(() => {
-  const bg = bgOptions.find(b => b.value === config.base.loginBg)
-  return bg?.preview || ''
-})
 
 // 加载配置
 loadConfig()
@@ -213,14 +201,6 @@ loadConfig()
               <div class="config-tip">系统名称：显示在登录页和顶部标题栏</div>
             </el-form-item>
             
-            <el-form-item label="登录页背景图">
-              <el-radio-group v-model="config.base.loginBg">
-                <el-radio v-for="bg in bgOptions" :key="bg.value" :label="bg.value">{{ bg.label }}</el-radio>
-              </el-radio-group>
-              <div class="bg-preview">
-                <img :src="currentBgPreview" alt="背景预览" />
-              </div>
-            </el-form-item>
             
             <el-form-item label="会话超时时间">
               <el-input-number v-model="config.base.sessionTimeout" :min="10" :max="1440" style="width: 200px" />
@@ -412,24 +392,12 @@ loadConfig()
   color: #F56C6C;
   font-weight: bold;
 }
-.bg-preview {
-  margin-top: 15px;
-  padding: 10px;
-  border: 1px solid #DCDFE6;
-  border-radius: 4px;
-  background: #F5F7FA;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-}
-.bg-preview img {
-  max-width: 300px;
-  border-radius: 4px;
-}
 .time-preview {
   margin-top: 10px;
   padding: 10px;
-  background: #FFF7E6;
+  background: rgba(230, 162, 60, 0.1);
   border-left: 4px solid #FAAD14;
-  color: #606266;
+  color: var(--el-text-color-regular);
   font-size: 13px;
 }
 </style>

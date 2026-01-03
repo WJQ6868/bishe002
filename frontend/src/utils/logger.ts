@@ -1,10 +1,11 @@
 import axios from 'axios'
 
-const API_LOG_URL = '/api/log/frontend'
+const API_LOG_URL = import.meta.env.VITE_FRONTEND_LOG_API || ''
 
 export const sendLog = (level: string, message: string, data?: any) => {
+  if (!API_LOG_URL) return
   // Prevent infinite loop if logging the log request itself
-  if (data?.url?.includes('/api/log/frontend')) return
+  if (data?.url?.includes(API_LOG_URL)) return
 
   const entry = {
     level,

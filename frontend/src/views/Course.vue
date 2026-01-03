@@ -123,7 +123,7 @@ const searchQuery = reactive({
   type: '',
   teacherId: ''
 })
-const loading = ref(false)
+// const loading = ref(false)
 const selectedRows = ref<Course[]>([])
 
 // 弹窗状态
@@ -567,9 +567,11 @@ onMounted(async () => {
 .action-bar {
   display: flex;
   justify-content: space-between;
-  background: #fff;
+  background: var(--card-bg);
+  backdrop-filter: blur(10px);
   padding: 15px;
   border-radius: 4px;
+  border: 1px solid var(--border-color);
 }
 .right-search {
   display: flex;
@@ -588,6 +590,26 @@ onMounted(async () => {
   overflow: hidden;
   padding: 0;
 }
+:deep(.el-table) {
+  background: transparent !important;
+  color: #fff !important;
+}
+:deep(.el-table th.el-table__cell) {
+  background: rgba(255, 255, 255, 0.05) !important;
+  color: #00f2fe !important;
+}
+:deep(.el-table__body td) {
+  background: transparent !important;
+  color: #fff !important;
+}
+:deep(.el-table__body tr:hover > td),
+:deep(.el-table__body tr.el-table__row--striped:hover > td) {
+  background: rgba(0, 242, 254, 0.08) !important;
+  color: #fff !important;
+}
+:deep(.el-table__row) {
+  background: transparent !important;
+}
 
 /* 评估详情 */
 .eval-header {
@@ -595,9 +617,10 @@ onMounted(async () => {
   justify-content: space-between;
   align-items: center;
   margin-bottom: 20px;
-  background: #f5f7fa;
+  background: rgba(255, 255, 255, 0.03);
   padding: 15px;
   border-radius: 4px;
+  border: 1px solid var(--border-color);
 }
 .total-score {
   text-align: center;
@@ -618,7 +641,7 @@ onMounted(async () => {
 }
 .dim-item span {
   font-size: 12px;
-  color: #909399;
+  color: rgba(255, 255, 255, 0.6);
   display: block;
   margin-bottom: 5px;
 }
@@ -627,18 +650,18 @@ onMounted(async () => {
   overflow-y: auto;
 }
 .comment-item {
-  border-bottom: 1px solid #ebeef5;
+  border-bottom: 1px solid var(--border-color);
   padding: 10px 0;
 }
 .comment-top {
   display: flex;
   justify-content: space-between;
   font-size: 12px;
-  color: #909399;
+  color: rgba(255, 255, 255, 0.6);
   margin-bottom: 5px;
 }
 .comment-content {
   margin-top: 5px;
-  color: #606266;
+  color: #fff;
 }
 </style>

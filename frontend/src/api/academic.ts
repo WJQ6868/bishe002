@@ -67,36 +67,36 @@ export interface TeacherItem {
 }
 
 export const fetchColleges = () =>
-  axios.get<{ items: CollegeItem[] }>('/api/college/list').then((res) => res.data.items)
+  axios.get<{ items: CollegeItem[] }>('/college/list').then((res) => res.data.items)
 
 export const addCollege = (payload: { name: string; code: string; status?: number }) =>
-  axios.post('/api/college/add', payload)
+  axios.post('/college/add', payload)
 
 export const updateCollege = (id: number, payload: Partial<{ name: string; code: string; status: number }>) =>
-  axios.put(`/api/college/${id}`, payload)
+  axios.put(`/college/${id}`, payload)
 
-export const deleteCollege = (id: number) => axios.delete(`/api/college/${id}`)
+export const deleteCollege = (id: number) => axios.delete(`/college/${id}`)
 
 export const fetchMajors = (collegeId?: number) =>
   axios
-    .get<{ items: MajorItem[] }>('/api/major/list', { params: { college_id: collegeId } })
+    .get<{ items: MajorItem[] }>('/major/list', { params: { college_id: collegeId } })
     .then((res) => res.data.items)
 
 export const addMajor = (payload: { name: string; code: string; status?: number; college_id?: number }) =>
-  axios.post('/api/major/add', payload)
+  axios.post('/major/add', payload)
 
 export const updateMajor = (id: number, payload: Partial<{ name: string; code: string; status: number; college_id: number }>) =>
-  axios.put(`/api/major/${id}`, payload)
+  axios.put(`/major/${id}`, payload)
 
-export const deleteMajor = (id: number) => axios.delete(`/api/major/${id}`)
+export const deleteMajor = (id: number) => axios.delete(`/major/${id}`)
 
 export const fetchClasses = (majorId: number) =>
   axios
-    .get<{ items: ClassItem[] }>('/api/major/class/list', { params: { major_id: majorId } })
+    .get<{ items: ClassItem[] }>('/major/class/list', { params: { major_id: majorId } })
     .then((res) => res.data.items)
 
 export const fetchAcademicClasses = (params: { college_id?: number; major_id?: number } = {}) =>
-  axios.get<{ items: AcademicClassItem[] }>('/api/class/list', { params }).then((res) => res.data.items)
+  axios.get<{ items: AcademicClassItem[] }>('/class/list', { params }).then((res) => res.data.items)
 
 export const addAcademicClass = (payload: {
   major_id: number
@@ -105,28 +105,28 @@ export const addAcademicClass = (payload: {
   status?: number
   teacher_id?: string | null
   student_count?: number
-}) => axios.post('/api/class/add', payload)
+}) => axios.post('/class/add', payload)
 
 export const updateAcademicClass = (id: number, payload: Partial<{ major_id: number; name: string; code: string | null; status: number; teacher_id: string | null; student_count: number }>) =>
-  axios.put(`/api/class/${id}`, payload)
+  axios.put(`/class/${id}`, payload)
 
 export const bindClassTeacher = (id: number, teacher_id: string) =>
-  axios.put(`/api/class/${id}/teacher`, { teacher_id })
+  axios.put(`/class/${id}/teacher`, { teacher_id })
 
 export const bindClassHeadTeacher = (id: number, teacher_no: string | null) =>
-  axios.put(`/api/class/${id}/head-teacher`, { teacher_no })
+  axios.put(`/class/${id}/head-teacher`, { teacher_no })
 
-export const deleteAcademicClass = (id: number) => axios.delete(`/api/class/${id}`)
+export const deleteAcademicClass = (id: number) => axios.delete(`/class/${id}`)
 
 export const fetchStudents = (classId: number) =>
   axios
-    .get<{ items: StudentItem[] }>('/api/class/student/list', { params: { class_id: classId } })
+    .get<{ items: StudentItem[] }>('/class/student/list', { params: { class_id: classId } })
     .then((res) => res.data.items)
 
 export const fetchAcademicStudents = (params: { class_id?: number } = {}) =>
-  axios.get<{ items: AcademicStudentItem[] }>('/api/student/list', { params }).then((res) => res.data.items)
+  axios.get<{ items: AcademicStudentItem[] }>('/student/list', { params }).then((res) => res.data.items)
 
-export const getAcademicStudent = (id: number) => axios.get<AcademicStudentItem>(`/api/student/${id}`).then((res) => res.data)
+export const getAcademicStudent = (id: number) => axios.get<AcademicStudentItem>(`/student/${id}`).then((res) => res.data)
 
 export const addAcademicStudent = (payload: {
   class_id: number
@@ -135,19 +135,19 @@ export const addAcademicStudent = (payload: {
   gender?: number | null
   mobile?: string | null
   status?: number
-}) => axios.post('/api/student/add', payload)
+}) => axios.post('/student/add', payload)
 
 export const updateAcademicStudent = (id: number, payload: Partial<{ class_id: number; student_code: string; name: string; gender: number | null; mobile: string | null; status: number }>) =>
-  axios.put(`/api/student/${id}`, payload)
+  axios.put(`/student/${id}`, payload)
 
-export const deleteAcademicStudent = (id: number) => axios.delete(`/api/student/${id}`)
+export const deleteAcademicStudent = (id: number) => axios.delete(`/student/${id}`)
 
 export const fetchCourses = (majorId: number) =>
   axios
-    .get<{ items: CourseItem[] }>('/api/major/course/list', { params: { major_id: majorId } })
+    .get<{ items: CourseItem[] }>('/major/course/list', { params: { major_id: majorId } })
     .then((res) => res.data.items)
 
 export const fetchCourseTeachers = (courseId: number) =>
   axios
-    .get<{ items: TeacherItem[] }>('/api/course/teacher/list', { params: { course_id: courseId } })
+    .get<{ items: TeacherItem[] }>('/course/teacher/list', { params: { course_id: courseId } })
     .then((res) => res.data.items)

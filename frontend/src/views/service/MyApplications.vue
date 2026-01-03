@@ -171,10 +171,11 @@ onMounted(() => {
   justify-content: space-between;
   align-items: center;
   margin-bottom: 20px;
-  background: var(--el-bg-color-overlay);
-  border: 1px solid var(--el-border-color-lighter);
+  background: var(--card-bg);
+  backdrop-filter: blur(10px);
+  border: 1px solid var(--border-color);
   border-radius: 12px;
-  box-shadow: var(--el-box-shadow-light);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
   padding: 16px 18px;
   gap: 12px;
   flex-wrap: wrap;
@@ -228,10 +229,10 @@ onMounted(() => {
 }
 
 .progress-section {
-  background: var(--el-fill-color-light);
+  background: rgba(255, 255, 255, 0.03);
   padding: 18px;
   border-radius: 12px;
-  border: 1px solid var(--el-border-color-lighter);
+  border: 1px solid var(--border-color);
   margin-bottom: 15px;
 }
 
@@ -248,10 +249,10 @@ onMounted(() => {
 }
 
 .form-data-view {
-  background: var(--el-fill-color-light);
+  background: rgba(255, 255, 255, 0.03);
   padding: 15px;
   border-radius: 12px;
-  border: 1px solid var(--el-border-color-lighter);
+  border: 1px solid var(--border-color);
 }
 
 .data-item {

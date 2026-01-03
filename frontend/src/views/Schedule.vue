@@ -584,20 +584,21 @@ const handleExport = () => {
 .summary-item {
   flex: 1;
   min-width: 120px;
-  background: #f5f7fa;
-  border-radius: 8px;
+  background: var(--card-bg);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
   padding: 12px;
   text-align: center;
 }
 .summary-item span {
   display: block;
-  color: #909399;
+  color: var(--el-text-color-secondary);
   font-size: 12px;
 }
 .summary-item strong {
   display: block;
   font-size: 20px;
-  color: #303133;
+  color: var(--primary-color);
   margin-top: 4px;
 }
 .main-content {
@@ -627,7 +628,7 @@ const handleExport = () => {
 }
 .label {
   font-size: 12px;
-  color: #909399;
+  color: var(--el-text-color-secondary);
   margin-bottom: 5px;
 }
 .percentage-value {
@@ -636,7 +637,7 @@ const handleExport = () => {
 }
 .empty-stats {
   text-align: center;
-  color: #909399;
+  color: var(--el-text-color-secondary);
   padding: 20px 0;
 }
 .algo-note {
@@ -659,7 +660,7 @@ const handleExport = () => {
   display: flex;
   align-items: center;
   font-size: 12px;
-  color: #909399;
+  color: var(--el-text-color-secondary);
 }
 .legend-dot {
   display: inline-block;
@@ -667,7 +668,7 @@ const handleExport = () => {
   height: 10px;
   border-radius: 50%;
   margin-right: 5px;
-  border: 1px solid #dcdfe6;
+  border: 1px solid var(--border-color);
 }
 .view-tag {
   margin-left: auto;
@@ -682,8 +683,8 @@ const handleExport = () => {
 .schedule-title {
   font-weight: bold;
   margin-bottom: 10px;
-  color: #606266;
-  border-left: 4px solid #faad14;
+  color: var(--el-text-color-primary);
+  border-left: 4px solid var(--primary-color);
   padding-left: 10px;
 }
 .course-cell {
@@ -702,7 +703,7 @@ const handleExport = () => {
   font-weight: bold;
 }
 .c-info {
-  color: #606266;
+  color: var(--el-text-color-secondary);
   font-size: 10px;
 }
 </style>

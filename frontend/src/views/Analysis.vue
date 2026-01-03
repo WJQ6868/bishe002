@@ -265,7 +265,7 @@ const rowClassName = ({ row }: { row: StudentAnalysis }) => {
   height: 400px;
 }
 :deep(.processed-row) {
-  background-color: #f0f9eb;
+  background-color: rgba(103, 194, 58, 0.1);
   color: #909399;
 }
 </style>

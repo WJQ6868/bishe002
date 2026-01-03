@@ -187,7 +187,7 @@ const moveVolunteer = (index: number, direction: 'up' | 'down') => {
       <!-- 右侧课程列表 -->
       <div class="right-panel">
         <el-card>
-          <el-table :data="filteredCourses" style="width: 100%" stripe :loading="courseLoading">
+          <el-table :data="filteredCourses" style="width: 100%" :loading="courseLoading">
             <el-table-column prop="name" label="课程名称" width="180">
               <template #default="{ row }">
                 <span style="font-weight: bold">{{ row.name }}</span>
@@ -245,7 +245,7 @@ const moveVolunteer = (index: number, direction: 'up' | 'down') => {
 .stats-info {
   margin-top: 20px;
   font-size: 14px;
-  color: #606266;
+  color: rgba(255, 255, 255, 0.7);
 }
 .volunteer-list {
   display: flex;
@@ -255,21 +255,22 @@ const moveVolunteer = (index: number, direction: 'up' | 'down') => {
 .volunteer-item {
   display: flex;
   align-items: center;
-  background: #f5f7fa;
+  background: rgba(255, 255, 255, 0.03);
   padding: 10px;
   border-radius: 4px;
-  border: 1px solid #e4e7ed;
+  border: 1px solid var(--border-color);
 }
 .rank-badge {
   width: 24px;
   height: 24px;
-  background: #409EFF;
-  color: white;
+  background: var(--primary-color);
+  color: #000;
   border-radius: 50%;
   text-align: center;
   line-height: 24px;
   margin-right: 10px;
   font-size: 12px;
+  font-weight: bold;
 }
 .v-info {
   flex: 1;
@@ -277,10 +278,11 @@ const moveVolunteer = (index: number, direction: 'up' | 'down') => {
 .v-name {
   font-weight: bold;
   font-size: 14px;
+  color: #fff;
 }
 .v-time {
   font-size: 12px;
-  color: #909399;
+  color: rgba(255, 255, 255, 0.6);
 }
 .v-actions {
   display: flex;
@@ -292,7 +294,18 @@ const moveVolunteer = (index: number, direction: 'up' | 'down') => {
 }
 .empty-tip {
   text-align: center;
-  color: #909399;
+  color: rgba(255, 255, 255, 0.5);
   padding: 20px;
+}
+
+:deep(.el-card) {
+  background: var(--card-bg) !important;
+  backdrop-filter: blur(10px);
+  border: 1px solid var(--border-color) !important;
+}
+
+:deep(.el-card__header) {
+  border-bottom: 1px solid var(--border-color) !important;
+  color: #fff !important;
 }
 </style>

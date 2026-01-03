@@ -64,16 +64,16 @@ const routes: RouteRecordRaw[] = [
         meta: { title: '学生用户管理', icon: 'User', roles: ['admin'] }
       },
       {
-        path: 'admin/service-approval',
-        name: 'ServiceApproval',
-        component: () => import('../views/admin/ServiceApproval.vue'),
-        meta: { title: '办事审批', icon: 'Stamp', roles: ['admin'] }
-      },
-      {
         path: 'admin/service-config',
         name: 'ServiceConfig',
         component: () => import('../views/admin/ServiceConfig.vue'),
         meta: { title: '申请功能维护', icon: 'Setting', roles: ['admin'] }
+      },
+      {
+        path: 'admin/service-approval',
+        name: 'ServiceApproval',
+        component: () => import('../views/admin/ServiceApproval.vue'),
+        meta: { title: '办事审批', icon: 'Stamp', roles: ['admin'] }
       },
       {
         path: 'admin/class-adjust',
@@ -96,7 +96,7 @@ const routes: RouteRecordRaw[] = [
       {
         path: 'ai-config',
         name: 'AIConfig',
-        component: () => import('../views/AIConfig.vue'),
+        component: () => import('../views/admin/AdminAIConfig.vue'),
         meta: { title: 'AI设置', roles: ['admin'] }
       },
       {
@@ -105,7 +105,7 @@ const routes: RouteRecordRaw[] = [
         component: () => import('../views/SystemConfig.vue'),
         meta: { title: '系统配置', icon: 'Setting', roles: ['admin'] }
       },
-      
+
       {
         path: 'analysis',
         name: 'Analysis',
@@ -195,7 +195,7 @@ const routes: RouteRecordRaw[] = [
         path: 'student/ai-service',
         name: 'StudentAIService',
         component: () => import('../views/student/AIService.vue'),
-        meta: { title: 'AI客服', icon: 'Service', roles: ['student'] }
+        meta: { title: 'AI客服', icon: 'Service', roles: ['student'], hidden: true }
       },
       {
         path: 'student/leave-apply',
@@ -215,14 +215,9 @@ const routes: RouteRecordRaw[] = [
         component: () => import('../views/teacher/CourseAssistant.vue'),
         meta: { title: 'AI课程助手', icon: 'Search', roles: ['teacher'] }
       },
-      {
-        path: 'student/attendance',
-        name: 'StudentAttendance',
-        component: () => import('../views/student/Attendance.vue'),
-        meta: { title: '上课签到', icon: 'Aim', roles: ['student'] }
-      },
+
       // Teacher Routes
-      
+
       {
         path: 'teacher/lesson-plan',
         name: 'TeacherLessonPlan',
@@ -247,12 +242,7 @@ const routes: RouteRecordRaw[] = [
         component: () => import('../views/teacher/Leave.vue'),
         meta: { title: '请假审批', icon: 'Stamp', roles: ['teacher'] }
       },
-      {
-        path: 'teacher/attendance',
-        name: 'TeacherAttendance',
-        component: () => import('../views/teacher/Attendance.vue'),
-        meta: { title: '上课点名', icon: 'Aim', roles: ['teacher'] }
-      },
+
       {
         path: 'teacher/homework',
         name: 'TeacherHomework',

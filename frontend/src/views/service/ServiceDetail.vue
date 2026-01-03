@@ -351,11 +351,12 @@ onMounted(() => {
 }
 
 .panel-card {
-  background: var(--el-bg-color-overlay);
+  background: var(--card-bg);
+  backdrop-filter: blur(10px);
   border-radius: 12px;
   padding: 30px;
-  border: 1px solid var(--el-border-color-lighter);
-  box-shadow: var(--el-box-shadow-light);
+  border: 1px solid var(--border-color);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
 }
 
 .service-header {
@@ -405,10 +406,10 @@ onMounted(() => {
 }
 
 .materials-list {
-  background: var(--el-fill-color-light);
+  background: rgba(255, 255, 255, 0.03);
   padding: 15px;
   border-radius: 12px;
-  border: 1px solid var(--el-border-color-lighter);
+  border: 1px solid var(--border-color);
 }
 
 .material-item {

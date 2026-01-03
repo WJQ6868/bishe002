@@ -4,7 +4,7 @@
  * 包含：作业列表、提交作业、查看批改
  */
 import { ref, reactive, onMounted, computed } from 'vue'
-import { ElMessage, ElMessageBox } from 'element-plus'
+import { ElMessage } from 'element-plus'
 import { UploadFilled } from '@element-plus/icons-vue'
 import axios from 'axios'
 
@@ -301,30 +301,35 @@ const getStatusTag = (status?: string) => {
 <style scoped>
 .homework-container {
   padding: 20px;
-  background: #fff;
+  background: var(--card-bg);
+  backdrop-filter: blur(10px);
+  border: 1px solid var(--border-color);
   border-radius: 8px;
   min-height: calc(100vh - 120px);
 }
 
 .hw-desc {
-  background: #F5F7FA;
+  background: rgba(255, 255, 255, 0.05);
   padding: 15px;
   border-radius: 4px;
   margin-bottom: 20px;
+  border: 1px solid var(--border-color);
 }
 
 .hw-desc h4 {
   margin: 0 0 10px 0;
+  color: #fff;
 }
 
 .desc-text {
-  color: #606266;
+  color: rgba(255, 255, 255, 0.7);
   font-size: 14px;
   margin: 0;
 }
 
 .detail-item {
   margin-bottom: 15px;
+  color: #fff;
 }
 
 .detail-item label {
@@ -339,10 +344,11 @@ const getStatusTag = (status?: string) => {
 }
 
 .comment {
-  background: #F0F9EB;
+  background: rgba(103, 194, 58, 0.1);
   padding: 10px;
   border-radius: 4px;
   color: #67C23A;
   margin-top: 5px;
+  border: 1px solid rgba(103, 194, 58, 0.2);
 }
 </style>

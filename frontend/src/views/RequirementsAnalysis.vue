@@ -323,15 +323,17 @@ const goBack = () => {
 <style scoped>
 .requirements-page {
   min-height: 100vh;
-  background-color: #f5f7fa;
+  background-color: transparent;
   display: flex;
   flex-direction: column;
 }
 
 .page-header {
-  background: #fff;
+  background: var(--card-bg);
+  backdrop-filter: blur(10px);
   padding: 20px 40px;
-  box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.05);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+  border-bottom: 1px solid var(--border-color);
   text-align: center;
   position: relative;
 }
@@ -350,7 +352,7 @@ const goBack = () => {
 .page-header h1 {
   margin: 0;
   font-size: 28px;
-  color: #303133;
+  color: var(--el-text-color-primary);
 }
 .subtitle {
   margin: 10px 0 0;
@@ -370,7 +372,9 @@ const goBack = () => {
 }
 
 .demand-tabs {
-  background: #fff;
+  background: var(--card-bg);
+  backdrop-filter: blur(10px);
+  border: 1px solid var(--border-color);
   min-height: 500px;
 }
 
@@ -399,7 +403,7 @@ const goBack = () => {
 }
 .card-desc {
   font-size: 13px;
-  color: #606266;
+  color: var(--el-text-color-regular);
   cursor: pointer;
   display: flex;
   align-items: center;
@@ -428,13 +432,13 @@ const goBack = () => {
 }
 .expand-content {
   padding: 10px 20px;
-  background: #fdf6ec;
+  background: rgba(230, 162, 60, 0.1);
   color: #e6a23c;
   border-radius: 4px;
 }
 /* 表格hover高亮 */
 :deep(.el-table__body tr:hover > td) {
-  background-color: #ecf5ff !important;
+  background-color: rgba(64, 158, 255, 0.1) !important;
 }
 
 /* 非功能需求 */

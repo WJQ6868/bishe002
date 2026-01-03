@@ -537,7 +537,7 @@ const save = async () => {
   saving.value = true
   try {
     const payload = buildPayload()
-    await axios.post('/api/service/admin/config/type', payload)
+    await axios.post('/service/admin/config/type', payload)
     ElMessage.success('保存成功')
     drawerVisible.value = false
     fetchList()
@@ -552,7 +552,7 @@ const save = async () => {
 const fetchList = async () => {
   loading.value = true
   try {
-    const { data } = await axios.get('/api/service/admin/config/types')
+    const { data } = await axios.get('/service/admin/config/types')
     items.value = data || []
   } catch (error) {
     console.error('获取配置失败', error)
@@ -564,7 +564,7 @@ const fetchList = async () => {
 
 const remove = async (id: number) => {
   try {
-    await axios.delete(`/api/service/admin/config/type/${id}`)
+    await axios.delete(`/service/admin/config/type/${id}`)
     ElMessage.success('删除成功')
     fetchList()
   } catch (error) {
@@ -617,7 +617,9 @@ fetchList()
 }
 
 .field-card {
-  border: 1px solid var(--el-border-color-lighter);
+  border: 1px solid var(--border-color);
+  background: var(--card-bg);
+  backdrop-filter: blur(10px);
 }
 
 .field-header {

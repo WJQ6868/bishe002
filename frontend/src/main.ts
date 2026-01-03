@@ -16,8 +16,7 @@ import { clearAuthState } from './utils/auth'
 
 const app = createApp(App)
 
-// 统一日期/时间与 Element Plus 组件语言为中文
-dayjs.locale('zh-cn')
+// 统一日期/时间�?Element Plus 组件语言为中�?dayjs.locale('zh-cn')
 
 app.use(createPinia())
 app.use(router)
@@ -55,3 +54,4 @@ axios.interceptors.response.use(
 )
 
 app.mount('#app')
+

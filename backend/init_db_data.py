@@ -15,7 +15,7 @@ from app.models.course import Course, Teacher
 from app.models.user import User
 from app.models.schedule import Classroom, Schedule, ClassroomResource
 from app.models.leave import LeaveApply
-from app.models.teaching import Attendance, Homework, HomeworkSubmit, ClassAdjust, WorkSchedule
+from app.models.teaching import Homework, HomeworkSubmit, ClassAdjust, WorkSchedule
 from app.dependencies.auth import get_password_hash
 from datetime import datetime, timedelta
 
@@ -422,31 +422,7 @@ async def init_data():
         await session.commit()
         print(f"Created {len(homework_submits)} homework submissions.")
         
-        # 7.4 Create Attendance Records
-        attendance_records = []
-        for course in courses[:5]:  # First 5 courses
-            # Get students who selected this course
-            result = await session.execute(
-                select(CourseSelection).where(CourseSelection.course_id == course.id)
-            )
-            course_selections = result.scalars().all()
-            
-            for selection in course_selections:
-                # Create 3 attendance records per student per course
-                for _ in range(3):
-                    record = Attendance(
-                        course_id=course.id,
-                        teacher_id=course.teacher_id,
-                        student_id=int(selection.student_id),
-                        status=random.choice(['已签到', '迟到', '未到', '请假']),
-                        sign_time=datetime.now() - timedelta(days=random.randint(1, 30))
-                    )
-                    session.add(record)
-                    attendance_records.append(record)
-        await session.commit()
-        print(f"Created {len(attendance_records)} attendance records.")
-        
-        # 7.5 Create Class Adjustment Requests
+        # 7.4 Create Class Adjustment Requests
         class_adjusts = []
         for teacher in teachers:
             # Get teacher's courses

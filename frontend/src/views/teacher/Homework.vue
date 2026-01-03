@@ -375,27 +375,32 @@ const getStatusTag = (status: string) => {
 <style scoped>
 .homework-container {
   padding: 20px;
-  background: #fff;
+  background: var(--card-bg);
+  backdrop-filter: blur(10px);
   border-radius: 8px;
   min-height: calc(100vh - 120px);
+  border: 1px solid var(--border-color);
 }
 
 .create-panel {
   padding: 20px;
-  background: #F5F7FA;
+  background: rgba(255, 255, 255, 0.05);
   border-radius: 4px;
+  border: 1px solid var(--border-color);
 }
 
 .hw-info {
   margin-bottom: 20px;
   padding-bottom: 10px;
-  border-bottom: 1px solid #EBEEF5;
+  border-bottom: 1px solid var(--border-color);
 }
 
 .content-box {
-  background: #F5F7FA;
+  background: rgba(255, 255, 255, 0.05);
   padding: 10px;
   border-radius: 4px;
   min-height: 60px;
+  color: var(--el-text-color-regular);
+  border: 1px solid var(--border-color);
 }
 </style>

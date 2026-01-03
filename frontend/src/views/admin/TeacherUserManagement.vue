@@ -374,4 +374,29 @@ onMounted(() => {
 .mb-3 {
   margin-bottom: 12px;
 }
+
+:deep(.el-table) {
+  background: transparent !important;
+  color: #fff !important;
+}
+
+:deep(.el-table__body td) {
+  background: transparent !important;
+  color: #fff !important;
+}
+
+:deep(.el-table__row) {
+  background: transparent !important;
+}
+
+:deep(.el-table__body tr:hover > td),
+:deep(.el-table__body tr.el-table__row--striped:hover > td) {
+  background: rgba(0, 242, 254, 0.08) !important;
+  color: #fff !important;
+}
+
+:deep(.el-table th.el-table__cell) {
+  background: rgba(255, 255, 255, 0.05) !important;
+  color: #00f2fe !important;
+}
 </style>

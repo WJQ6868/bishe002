@@ -99,7 +99,8 @@ const services = ref<any[]>([])
 const quickLinks = ref<any[]>([])
 // 过滤占位/自动生成的快捷入口（避免前端展示英文占位项）
 const displayQuickLinks = computed(() => {
-  return (quickLinks.value || []).filter((l: any) => {
+  const list = Array.isArray(quickLinks.value) ? quickLinks.value : []
+  return list.filter((l: any) => {
     const nameRaw = String(l?.name || '').trim()
     const descRaw = String(l?.description || '').trim()
     const name = nameRaw.toLowerCase()
@@ -142,9 +143,10 @@ const fetchQuickLinks = async () => {
     const response = await axios.get('/quick-link/list', {
       headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
     })
-    quickLinks.value = response.data
+    quickLinks.value = Array.isArray(response.data) ? response.data : []
   } catch (error) {
     console.error('获取快捷入口失败', error)
+    quickLinks.value = []
   }
 }
 
@@ -156,7 +158,7 @@ const fetchServices = async () => {
       ElMessage.warning('未检测到登录凭证，请重新登录')
       return
     }
-    const response = await axios.get('/api/service/list')
+    const response = await axios.get('/service/list')
     services.value = response.data
   } catch (error) {
     console.error('获取办事项目失败', error)
@@ -190,11 +192,12 @@ onMounted(() => {
   justify-content: space-between;
   align-items: center;
   margin-bottom: 30px;
-  background: var(--el-bg-color-overlay);
+  background: var(--card-bg);
+  backdrop-filter: blur(10px);
   padding: 20px;
   border-radius: 12px;
-  border: 1px solid var(--el-border-color-lighter);
-  box-shadow: var(--el-box-shadow-light);
+  border: 1px solid var(--border-color);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
   flex-wrap: wrap;
   gap: 14px;
 }
@@ -260,11 +263,12 @@ onMounted(() => {
   align-items: flex-start;
   gap: 15px;
   padding: 20px;
-  background: var(--el-bg-color-overlay);
+  background: var(--card-bg);
+  backdrop-filter: blur(10px);
   border-radius: 12px;
   cursor: pointer;
   transition: all 0.3s;
-  border: 1px solid var(--el-border-color-lighter);
+  border: 1px solid var(--border-color);
   min-height: 110px;
 }
 
@@ -306,16 +310,17 @@ onMounted(() => {
   align-items: center;
   gap: 8px;
   padding: 10px 20px;
-  background: var(--el-bg-color-overlay);
+  background: var(--card-bg);
+  backdrop-filter: blur(10px);
   border-radius: 20px;
   cursor: pointer;
   transition: all 0.3s;
-  border: 1px solid var(--el-border-color);
+  border: 1px solid var(--border-color);
   white-space: nowrap;
 }
 
 .category-item:hover {
-  color: var(--el-color-primary);
+  color: #000 !important;
   border-color: var(--el-color-primary-light-7);
   background: var(--el-color-primary-light-9);
 }
@@ -328,13 +333,14 @@ onMounted(() => {
 }
 
 .service-card {
-  background: var(--el-bg-color-overlay);
+  background: var(--card-bg);
+  backdrop-filter: blur(10px);
   border-radius: 12px;
   padding: 20px;
   margin-bottom: 20px;
   cursor: pointer;
   transition: all 0.3s;
-  border: 1px solid var(--el-border-color-lighter);
+  border: 1px solid var(--border-color);
   display: flex;
   align-items: flex-start;
   gap: 15px;
@@ -354,7 +360,7 @@ onMounted(() => {
   display: flex;
   align-items: center;
   justify-content: center;
-  color: var(--el-color-primary);
+  color: var(--el-color-primary) !important;
   font-size: 24px;
   flex-shrink: 0;
 }
@@ -379,6 +385,8 @@ onMounted(() => {
   margin-bottom: 10px;
   flex-wrap: wrap;
 }
+
+/* Removed conflicting tag styles to let global theme handle it */
 
 .status-indicator {
   font-size: 12px;

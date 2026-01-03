@@ -198,7 +198,15 @@ class DashscopeOpenAIClient:
         redis_client.setex(key, 86400, json.dumps(history))
 
     @retry(stop=stop_after_attempt(2), wait=wait_fixed(1))
-    def call_stream_api(self, user_id: str, question: str, history_flag: bool) -> Generator[str, None, None]:
+    def call_stream_api(
+        self,
+        user_id: str,
+        question: str,
+        history_flag: bool,
+        api_key: Optional[str] = None,
+        base_url: Optional[str] = None,
+        model: Optional[str] = None,
+    ) -> Generator[str, None, None]:
         if self._check_sensitive(question):
             yield "data: {\"content\": \"抱歉，您的问题包含敏感词，暂无法回答。\"}\n\n"
             return
@@ -213,12 +221,25 @@ class DashscopeOpenAIClient:
             messages = self.get_history(user_id)
         messages.append({"role": "user", "content": question})
 
+        # Allow per-call override from DB-configured admin settings
+        api_key = (api_key or self.api_key or "").strip()
+        base_url = (base_url or self.base_url or "").rstrip("/")
+        use_model = (model or self.model or "").strip() or self.model
+
         try:
-            if self._openai_client:
-                completion = self._openai_client.chat.completions.create(
-                    model=self.model,
+            if OpenAI and api_key and base_url:
+                try:
+                    client = OpenAI(api_key=api_key, base_url=base_url)
+                except Exception:
+                    client = None
+            else:
+                client = None
+
+            if client:
+                completion = client.chat.completions.create(
+                    model=use_model,
                     messages=messages,
-                    stream=False
+                    stream=False,
                 )
                 # OpenAI SDK returns pydantic-like object
                 # Extract message content
@@ -233,15 +254,15 @@ class DashscopeOpenAIClient:
 
             # Fallback: HTTP call via httpx
             payload = {
-                "model": self.model,
+                "model": use_model,
                 "messages": messages,
                 "stream": False
             }
             headers = {
-                "Authorization": f"Bearer {self.api_key}",
+                "Authorization": f"Bearer {api_key}",
                 "Content-Type": "application/json"
             }
-            with httpx.Client(base_url=self.base_url, timeout=30) as client:
+            with httpx.Client(base_url=base_url, timeout=30) as client:
                 resp = client.post("/chat/completions", json=payload, headers=headers)
                 if resp.status_code != 200:
                     try:
@@ -273,9 +294,20 @@ class ArkResponsesClient:
         self.base_url = "https://ark.cn-beijing.volces.com/api/v3"
         self.model = "deepseek-v3-2-251201"
 
-    def call_stream_api(self, user_id: str, question: str, history_flag: bool) -> Generator[str, None, None]:
+    def call_stream_api(
+        self,
+        user_id: str,
+        question: str,
+        history_flag: bool,
+        api_key: Optional[str] = None,
+        base_url: Optional[str] = None,
+        model: Optional[str] = None,
+    ) -> Generator[str, None, None]:
+        api_key = (api_key or self.api_key or "").strip()
+        base_url = (base_url or self.base_url or "").rstrip("/")
+        use_model = (model or self.model or "").strip() or self.model
         payload = {
-            "model": self.model,
+            "model": use_model,
             "stream": False,
             "input": [
                 {
@@ -287,12 +319,12 @@ class ArkResponsesClient:
             ]
         }
         headers = {
-            "Authorization": f"Bearer {self.api_key}",
+            "Authorization": f"Bearer {api_key}",
             "Content-Type": "application/json"
         }
         try:
             with httpx.Client(timeout=30) as client:
-                resp = client.post(f"{self.base_url}/responses", json=payload, headers=headers)
+                resp = client.post(f"{base_url}/responses", json=payload, headers=headers)
                 if resp.status_code != 200:
                     try:
                         err = resp.json()

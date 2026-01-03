@@ -419,15 +419,34 @@ onMounted(() => {
 }
 /* 已退课行样式 */
 :deep(.el-table .dropped-row) {
-  background: #F5F7FA;
-  color: #909399;
+  background: rgba(255, 255, 255, 0.05) !important;
+  color: rgba(255, 255, 255, 0.5) !important;
 }
-/* 表格 hover 效果（学生端蓝色） */
+/* 表格 hover 效果 */
 :deep(.el-table__body tr:hover > td) {
-  background-color: #E6F7FF !important;
+  background-color: rgba(255, 255, 255, 0.1) !important;
 }
 /* 退课按钮样式 */
 :deep(.el-button--danger.is-link:hover) {
-  color: #C0392B;
+  color: #f56c6c;
+}
+
+:deep(.el-card) {
+  background: var(--card-bg) !important;
+  backdrop-filter: blur(10px);
+  border: 1px solid var(--border-color) !important;
+}
+
+:deep(.el-card__header) {
+  border-bottom: 1px solid var(--border-color) !important;
+  color: #fff !important;
+}
+
+:deep(.el-tabs__item) {
+  color: rgba(255, 255, 255, 0.7) !important;
+}
+
+:deep(.el-tabs__item.is-active) {
+  color: var(--primary-color) !important;
 }
 </style>

@@ -1,5 +1,5 @@
-/**
- * 好友管理 API 封装
+﻿/**
+ * 濂藉弸绠＄悊 API 灏佽
  * Friend Management API Wrapper
  */
 import axios from 'axios'
@@ -42,67 +42,68 @@ export interface FriendInfo {
 
 export const friendAPI = {
     /**
-     * 搜索用户
+     * 鎼滅储鐢ㄦ埛
      */
     searchUser: (keyword: string) => {
         return axios.get<{ code: number; data: { results: FriendSearchResult[] } }>(
-            '/api/friend/search',
+            '/friend/search',
             { params: { keyword } }
         )
     },
 
     /**
-     * 发送好友申请
+     * 鍙戦€佸ソ鍙嬬敵璇?
      */
     sendRequest: (toUserId: number, message?: string) => {
-        return axios.post('/api/friend/request/send', {
+        return axios.post('/friend/request/send', {
             to_user_id: toUserId,
             message
         })
     },
 
     /**
-     * 获取收到的好友申请列表
+     * 鑾峰彇鏀跺埌鐨勫ソ鍙嬬敵璇峰垪琛?
      */
     getReceivedRequests: (statusFilter: string = 'pending') => {
         return axios.get<{ code: number; data: { requests: FriendRequest[]; total: number } }>(
-            '/api/friend/request/list',
+            '/friend/request/list',
             { params: { status_filter: statusFilter } }
         )
     },
 
     /**
-     * 获取发出的好友申请列表
+     * 鑾峰彇鍙戝嚭鐨勫ソ鍙嬬敵璇峰垪琛?
      */
     getSentRequests: () => {
         return axios.get<{ code: number; data: { requests: FriendRequest[]; total: number } }>(
-            '/api/friend/request/sent'
+            '/friend/request/sent'
         )
     },
 
     /**
-     * 处理好友申请（接受/拒绝）
+     * 澶勭悊濂藉弸鐢宠锛堟帴鍙?鎷掔粷锛?
      */
     processRequest: (requestId: number, action: 'accept' | 'reject') => {
-        return axios.post('/api/friend/request/process', {
+        return axios.post('/friend/request/process', {
             request_id: requestId,
             action
         })
     },
 
     /**
-     * 获取好友列表
+     * 鑾峰彇濂藉弸鍒楄〃
      */
     getFriendList: () => {
         return axios.get<{ code: number; data: { friends: FriendInfo[]; total: number } }>(
-            '/api/friend/list'
+            '/friend/list'
         )
     },
 
     /**
-     * 删除好友
+     * 鍒犻櫎濂藉弸
      */
     deleteFriend: (friendId: number) => {
         return axios.delete(`/api/friend/delete/${friendId}`)
     }
 }
+

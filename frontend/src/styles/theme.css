@@ -1,36 +1,460 @@
+/* 1. Root Variables */
 :root {
-  --bg-color: #f0f2f5;
-  --header-bg-color: #ffffff;
-  --sidebar-bg-color: #304156;
-  --text-color: #303133;
-  --header-text-color: #606266;
+  --primary-color: #00f2fe;
+  --bg-color: #050505;
+  --card-bg: rgba(20, 20, 20, 0.6);
+  --border-color: rgba(255, 255, 255, 0.1);
+  --text-primary: #ffffff;
+  --text-secondary: rgba(255, 255, 255, 0.7);
+
+  /* Element Plus Overrides */
+  --el-color-primary: #00f2fe;
+  --el-bg-color: #050505;
+  --el-text-color-primary: #ffffff;
+  --el-text-color-regular: rgba(255, 255, 255, 0.9);
+  --el-text-color-secondary: rgba(255, 255, 255, 0.7);
+  --el-text-color-placeholder: rgba(255, 255, 255, 0.5);
+  --el-border-color: rgba(255, 255, 255, 0.1);
+  --el-border-color-light: rgba(255, 255, 255, 0.05);
+  --el-fill-color-blank: transparent;
 }
 
-html.dark {
-  --bg-color: #1a1a1a;
-  --header-bg-color: #1d1e1f;
-  --sidebar-bg-color: #141414;
-  --text-color: #cfd3dc;
-  --header-text-color: #cfd3dc;
-}
-
-/* Apply to elements */
+/* 2. Global Styles */
 body {
   background-color: var(--bg-color);
-  color: var(--text-color);
-  transition: background-color 0.3s, color 0.3s;
+  color: var(--text-primary);
+  margin: 0;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
 }
 
-.el-header {
-  background-color: var(--header-bg-color) !important;
-  color: var(--header-text-color);
-  border-bottom-color: var(--el-border-color) !important;
+/* 3. Glassmorphism Utilities */
+.glass-card {
+  background: var(--card-bg);
+  backdrop-filter: blur(10px);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
 }
 
-.el-aside .el-menu {
-  background-color: var(--sidebar-bg-color) !important;
+/* 4. Element Plus Component Overrides */
+.el-card {
+  background: var(--card-bg) !important;
+  backdrop-filter: blur(10px);
+  border: 1px solid var(--border-color) !important;
+  color: #fff !important;
 }
 
-.el-main {
-  background-color: var(--bg-color) !important;
+.el-input__wrapper,
+.el-select__wrapper {
+  background-color: rgba(255, 255, 255, 0.05) !important;
+  box-shadow: 0 0 0 1px var(--border-color) inset !important;
+}
+
+.el-input__inner,
+.el-select__placeholder,
+.el-select__selection {
+  color: #fff !important;
+}
+
+.el-select-dropdown {
+  background-color: rgba(30, 30, 30, 0.9) !important;
+  backdrop-filter: blur(20px);
+  border: 1px solid var(--border-color) !important;
+}
+
+.el-select-dropdown__item {
+  color: rgba(255, 255, 255, 0.8) !important;
+}
+
+.el-select-dropdown__item.is-hovering {
+  background-color: rgba(0, 242, 254, 0.1) !important;
+  color: #00f2fe !important;
+}
+
+.el-select-dropdown__item.is-selected {
+  color: #00f2fe !important;
+  font-weight: bold;
+}
+
+.el-button--primary {
+  background: linear-gradient(135deg, #00f2fe 0%, #4facfe 100%) !important;
+  border: none !important;
+  color: #000 !important;
+  font-weight: 600 !important;
+}
+
+.el-button--danger {
+  background: linear-gradient(135deg, #f56c6c 0%, #f78989 100%) !important;
+  border: none !important;
+  color: #fff !important;
+}
+
+.el-button--danger.is-plain {
+  background: rgba(245, 108, 108, 0.1) !important;
+  border: 1px solid rgba(245, 108, 108, 0.5) !important;
+  color: #f56c6c !important;
+}
+
+.el-button--success.is-plain {
+  background: rgba(103, 194, 58, 0.1) !important;
+  border: 1px solid rgba(103, 194, 58, 0.5) !important;
+  color: #67c23a !important;
+}
+
+.el-button--warning.is-plain {
+  background: rgba(230, 162, 60, 0.1) !important;
+  border: 1px solid rgba(230, 162, 60, 0.5) !important;
+  color: #e6a23c !important;
+}
+
+.el-button--primary:hover,
+.el-button--danger:hover {
+  opacity: 0.9;
+  transform: translateY(-1px);
+}
+
+/* 5. Scrollbar Styling */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.1);
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+/* 6. Navigation Overrides */
+.el-menu {
+  background-color: transparent !important;
+  border-right: none !important;
+}
+
+.el-menu-item {
+  color: rgba(255, 255, 255, 0.7) !important;
+}
+
+.el-menu-item.is-active {
+  color: #00f2fe !important;
+  background-color: rgba(0, 242, 254, 0.1) !important;
+}
+
+/* 7. Table Overrides */
+.el-table {
+  background-color: transparent !important;
+  --el-table-border-color: rgba(255, 255, 255, 0.05);
+}
+
+.el-table tr {
+  background-color: transparent !important;
+}
+
+.el-table th.el-table__cell {
+  background-color: rgba(255, 255, 255, 0.05) !important;
+}
+
+.el-table--enable-row-hover .el-table__body tr:hover>td {
+  background-color: rgba(255, 255, 255, 0.05) !important;
+}
+
+/* 8. Dialog Overrides */
+.el-dialog {
+  background: rgba(30, 30, 30, 0.9) !important;
+  backdrop-filter: blur(20px);
+  border: 1px solid var(--border-color);
+  border-radius: 16px !important;
+}
+
+.el-dialog__title {
+  color: #fff !important;
+}
+
+/* 9. Popper & Tooltip Overrides */
+.el-popper {
+  background: rgba(30, 30, 30, 0.95) !important;
+  backdrop-filter: blur(20px);
+  border: 1px solid var(--border-color) !important;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5) !important;
+}
+
+.el-popper__arrow::before {
+  background: rgba(30, 30, 30, 0.95) !important;
+  border: 1px solid var(--border-color) !important;
+}
+
+.el-tooltip__popper {
+  color: #fff !important;
+}
+
+.el-popover {
+  background: rgba(30, 30, 30, 0.95) !important;
+  color: #fff !important;
+  border: 1px solid var(--border-color) !important;
+}
+
+/* 10. Message Box & Notification Overrides */
+.el-message-box {
+  background: rgba(30, 30, 30, 0.95) !important;
+  backdrop-filter: blur(20px);
+  border: 1px solid var(--border-color) !important;
+}
+
+.el-message-box__title,
+.el-message-box__content {
+  color: #fff !important;
+}
+
+.el-notification {
+  background: rgba(30, 30, 30, 0.95) !important;
+  backdrop-filter: blur(20px);
+  border: 1px solid var(--border-color) !important;
+}
+
+.el-notification__title,
+.el-notification__content {
+  color: #fff !important;
+}
+
+/* 11. Message & Loading Overrides */
+.el-message {
+  background: rgba(30, 30, 30, 0.95) !important;
+  backdrop-filter: blur(20px);
+  border: 1px solid var(--border-color) !important;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5) !important;
+}
+
+.el-message__content {
+  color: #fff !important;
+}
+
+.el-loading-mask {
+  background-color: rgba(0, 0, 0, 0.7) !important;
+  backdrop-filter: blur(4px);
+}
+
+/* 12. ECharts Tooltip Global Override */
+/* This targets the HTML elements generated by ECharts */
+div[style*="z-index: 9999999"] {
+  background-color: rgba(20, 20, 20, 0.9) !important;
+  border: 1px solid var(--border-color) !important;
+  border-radius: 4px !important;
+  color: #fff !important;
+  backdrop-filter: blur(10px);
+}
+
+/* 13. Global Smart Text Color Logic */
+/* Change text to dark when background is light/white */
+
+/* Tags with light backgrounds - make them dark glassmorphism instead of light */
+.el-tag--plain,
+.el-tag--light,
+.el-tag.el-tag--info {
+  background-color: rgba(255, 255, 255, 0.1) !important;
+  border-color: rgba(255, 255, 255, 0.2) !important;
+  color: #ffffff !important;
+}
+
+.el-tag.el-tag--success.is-plain,
+.el-tag.el-tag--success.el-tag--light {
+  background-color: rgba(103, 194, 58, 0.2) !important;
+  border-color: rgba(103, 194, 58, 0.3) !important;
+  color: #67c23a !important;
+}
+
+.el-tag.el-tag--warning.is-plain,
+.el-tag.el-tag--warning.el-tag--light {
+  background-color: rgba(230, 162, 60, 0.2) !important;
+  border-color: rgba(230, 162, 60, 0.3) !important;
+  color: #e6a23c !important;
+}
+
+.el-tag.el-tag--danger.is-plain,
+.el-tag.el-tag--danger.el-tag--light {
+  background-color: rgba(245, 108, 108, 0.2) !important;
+  border-color: rgba(245, 108, 108, 0.3) !important;
+  color: #f56c6c !important;
+}
+
+.el-tag.el-tag--primary.is-plain,
+.el-tag.el-tag--primary.el-tag--light {
+  background-color: rgba(0, 242, 254, 0.2) !important;
+  border-color: rgba(0, 242, 254, 0.3) !important;
+  color: #00f2fe !important;
+}
+
+/* Force dark text on specific light-background classes */
+.bg-white,
+.bg-light,
+[style*="background: white"],
+[style*="background: #fff"],
+[style*="background-color: white"],
+[style*="background-color: #fff"],
+[style*="background: rgb(255, 255, 255)"],
+[style*="background-color: rgb(255, 255, 255)"] {
+  color: #303133 !important;
+}
+
+/* Ensure children of white backgrounds also have dark text */
+.bg-white *,
+.bg-light *,
+[style*="background: white"] *,
+[style*="background: #fff"] *,
+[style*="background-color: white"] *,
+[style*="background-color: #fff"] * {
+  color: #303133 !important;
+}
+
+/* Table headers often have a light tint */
+.el-table th.el-table__cell {
+  color: var(--primary-color) !important;
+}
+
+/* Descriptions Overrides */
+.el-descriptions__table {
+  background-color: transparent !important;
+}
+
+.el-descriptions__label.is-bordered-label {
+  background-color: rgba(255, 255, 255, 0.05) !important;
+  color: var(--primary-color) !important;
+  border: 1px solid var(--border-color) !important;
+}
+
+.el-descriptions__content.is-bordered-content {
+  background-color: transparent !important;
+  color: #fff !important;
+  border: 1px solid var(--border-color) !important;
+}
+
+/* Alert Overrides */
+.el-alert {
+  background-color: rgba(255, 255, 255, 0.05) !important;
+  backdrop-filter: blur(10px);
+  border: 1px solid var(--border-color) !important;
+}
+
+.el-alert--success.is-dark {
+  background-color: rgba(103, 194, 58, 0.2) !important;
+}
+
+.el-alert--info.is-dark {
+  background-color: rgba(144, 147, 153, 0.2) !important;
+}
+
+.el-alert--warning.is-dark {
+  background-color: rgba(230, 162, 60, 0.2) !important;
+}
+
+.el-alert--error.is-dark {
+  background-color: rgba(245, 108, 108, 0.2) !important;
+}
+
+.el-alert__title,
+.el-alert__description {
+  color: #fff !important;
+}
+
+/* Override the overly aggressive global white text rule for light backgrounds */
+/* Force dark text ONLY on explicitly light-background containers that are NOT glassmorphism */
+.bg-white p,
+.bg-white span,
+.bg-white label,
+.bg-light p,
+.bg-light span,
+.bg-light label {
+  color: #303133 !important;
+}
+
+/* 10. Global Gray Text Override - Change ALL gray text to white */
+.el-descriptions__label,
+.el-descriptions__content,
+.el-form-item__label,
+.el-tag--info,
+.el-upload__tip,
+.el-empty__description,
+.el-collapse-item__header,
+.el-timeline-item__timestamp,
+.el-step__description,
+.el-result__subtitle,
+.el-alert__description,
+.el-drawer__title,
+.el-breadcrumb__item,
+.el-breadcrumb__separator,
+.el-badge__content.is-fixed,
+.el-statistic__description,
+.el-rate__text,
+.el-date-editor,
+.el-form-item__error,
+p:not(.bg-white *):not(.bg-light *),
+span:not(.bg-white *):not(.bg-light *),
+label:not(.bg-white *):not(.bg-light *),
+small:not(.bg-white *):not(.bg-light *),
+.text-gray,
+.text-secondary,
+.text-muted {
+  color: #ffffff !important;
+}
+
+/* Table cell text */
+.el-table .cell {
+  color: #ffffff !important;
+}
+
+/* Tag colors */
+.el-tag {
+  color: #ffffff !important;
+}
+
+/* Info and secondary colors */
+.el-text--info,
+.el-link--info,
+.el-icon--info {
+  color: rgba(255, 255, 255, 0.9) !important;
+}
+
+/* Override any inline gray colors */
+[style*="color: #909399"],
+[style*="color: #606266"],
+[style*="color: #C0C4CC"],
+[style*="color: rgb(144, 147, 153)"],
+[style*="color: rgb(96, 98, 102)"],
+[style*="color: rgb(192, 196, 204)"] {
+  color: #ffffff !important;
+}
+
+/* Tabs override */
+.el-tabs--border-card,
+.el-tabs--border-card > .el-tabs__header,
+.el-tabs--border-card > .el-tabs__content {
+  background: var(--card-bg) !important;
+  border-color: var(--border-color) !important;
+}
+
+.el-tabs__header {
+  background: transparent !important;
+}
+
+.el-tabs__nav-wrap::after {
+  background-color: transparent !important;
+}
+
+.el-tabs__item {
+  color: rgba(255, 255, 255, 0.9) !important;
+}
+
+.el-tabs__item.is-active {
+  color: var(--primary-color) !important;
+  font-weight: 600;
+}
+
+/* Progress bar text visibility */
+.el-progress__text {
+  color: #ffffff !important;
 }

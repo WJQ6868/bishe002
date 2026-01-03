@@ -137,7 +137,7 @@ const fetchApplications = async () => {
   loading.value = true
   try {
     const params = statusFilter.value ? { status: statusFilter.value } : {}
-    const response = await axios.get('/api/service/admin/list', { params })
+    const response = await axios.get('/service/admin/list', { params })
     applications.value = response.data
   } catch (error) {
     console.error('获取申请列表失败', error)
@@ -189,7 +189,7 @@ const submitApproval = async () => {
 
   submitting.value = true
   try {
-    await axios.put('/api/service/apply/approve', {
+    await axios.put('/service/apply/approve', {
       id: currentApply.value.id,
       result: approvalType.value,
       opinion: approvalForm.value.opinion || '审批通过'
@@ -231,6 +231,7 @@ onMounted(() => {
 <style scoped>
 .service-approval {
   padding: 20px;
+  color: #fff;
 }
 
 .page-header {
@@ -240,9 +241,15 @@ onMounted(() => {
   margin-bottom: 20px;
 }
 
+.page-header h2 {
+  color: #fff;
+  margin: 0;
+}
+
 .expand-details {
   padding: 20px;
-  background: #f5f7fa;
+  background: rgba(255, 255, 255, 0.02);
+  border-radius: 8px;
 }
 
 .section {
@@ -251,8 +258,8 @@ onMounted(() => {
 
 .section h4 {
   margin: 0 0 10px;
-  color: #303133;
-  border-left: 4px solid #409eff;
+  color: #00f2fe;
+  border-left: 4px solid #00f2fe;
   padding-left: 10px;
 }
 
@@ -261,8 +268,45 @@ onMounted(() => {
   align-items: center;
   gap: 10px;
   padding: 8px;
-  background: white;
+  background: rgba(255, 255, 255, 0.05);
   border-radius: 4px;
   margin-bottom: 5px;
+  color: #fff;
 }
+
+:deep(.el-table) {
+  background-color: transparent !important;
+  color: #fff !important;
+}
+
+:deep(.el-table__row) {
+  background-color: transparent !important;
+}
+
+:deep(.el-table__body td) {
+  background-color: transparent !important;
+  color: #fff !important;
+}
+
+:deep(.el-table__body tr:hover > td),
+:deep(.el-table__body tr.el-table__row--striped:hover > td) {
+  background-color: rgba(0, 242, 254, 0.08) !important;
+  color: #fff !important;
+}
+
+:deep(.el-table th.el-table__cell) {
+  background-color: rgba(255, 255, 255, 0.05) !important;
+  color: #00f2fe !important;
+}
+
+:deep(.el-descriptions__label) {
+  background-color: rgba(255, 255, 255, 0.05) !important;
+  color: #fff !important;
+}
+
+:deep(.el-descriptions__content) {
+  background-color: transparent !important;
+  color: #fff !important;
+}
+
 </style>

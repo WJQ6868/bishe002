@@ -15,7 +15,7 @@ from app.models.student import Student, StudentWarning, CourseSelection, Grade
 from app.models.admin import Admin
 from app.models.schedule import Classroom, Schedule, ClassroomResource
 from app.models.leave import LeaveApply
-from app.models.teaching import Attendance, Homework, HomeworkSubmit, ClassAdjust, WorkSchedule
+from app.models.teaching import Homework, HomeworkSubmit, ClassAdjust, WorkSchedule
 
 async def clean_database():
     engine = create_async_engine(DATABASE_URL, echo=False)
@@ -30,7 +30,7 @@ async def clean_database():
         print("Cleaning dependent tables...")
         
         tables_to_clear = [
-            Grade, CourseSelection, LeaveApply, HomeworkSubmit, Attendance, 
+            Grade, CourseSelection, LeaveApply, HomeworkSubmit, 
             ClassAdjust, WorkSchedule, Schedule, StudentWarning, 
             Homework, Course, ClassroomResource, Classroom
         ]

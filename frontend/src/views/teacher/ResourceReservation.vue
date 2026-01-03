@@ -392,11 +392,13 @@ const disabledDate = (time: Date) => {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  background: #fff;
+  background: var(--card-bg);
+  backdrop-filter: blur(10px);
   padding: 10px 20px;
   border-radius: 4px;
   box-shadow: 0 1px 4px rgba(0,0,0,0.05);
   height: 50px;
+  border: 1px solid var(--border-color);
 }
 .type-tabs {
   flex: 1;
@@ -407,7 +409,7 @@ const disabledDate = (time: Date) => {
 .page-title {
   font-size: 16px;
   font-weight: 600;
-  color: #303133;
+  color: var(--el-text-color-primary);
 }
 
 .main-content {
@@ -418,17 +420,19 @@ const disabledDate = (time: Date) => {
 }
 .filter-panel {
   width: 280px;
-  background: #fff;
+  background: var(--card-bg);
+  backdrop-filter: blur(10px);
   padding: 20px;
   border-radius: 4px;
   display: flex;
   flex-direction: column;
+  border: 1px solid var(--border-color);
 }
 .filter-title {
   font-size: 16px;
   font-weight: 600;
   margin-bottom: 20px;
-  color: #303133;
+  color: var(--el-text-color-primary);
 }
 .device-group {
   display: flex;
@@ -438,29 +442,34 @@ const disabledDate = (time: Date) => {
 .filter-tip {
   margin-top: auto;
   padding: 10px;
-  background: #fdf6ec;
+  background: rgba(230, 162, 60, 0.1);
   color: #e6a23c;
   font-size: 12px;
   border-radius: 4px;
   display: flex;
   align-items: center;
   gap: 5px;
+  border: 1px solid rgba(230, 162, 60, 0.2);
 }
 
 .list-panel {
   flex: 1;
-  background: #fff;
+  background: var(--card-bg);
+  backdrop-filter: blur(10px);
   padding: 20px;
   border-radius: 4px;
   overflow: hidden;
+  border: 1px solid var(--border-color);
 }
 
 .my-reservations {
   flex: 1;
-  background: #fff;
+  background: var(--card-bg);
+  backdrop-filter: blur(10px);
   padding: 20px;
   border-radius: 4px;
   overflow: auto;
+  border: 1px solid var(--border-color);
 }
 
 /* 弹窗样式 */
@@ -469,8 +478,9 @@ const disabledDate = (time: Date) => {
   gap: 20px;
   margin-bottom: 20px;
   padding: 10px;
-  background: #f5f7fa;
+  background: rgba(255, 255, 255, 0.05);
   border-radius: 4px;
+  color: var(--el-text-color-regular);
 }
 .section-title {
   display: flex;
@@ -478,6 +488,7 @@ const disabledDate = (time: Date) => {
   align-items: center;
   margin-bottom: 10px;
   font-weight: 600;
+  color: var(--el-text-color-primary);
 }
 .slots-grid {
   display: grid;
@@ -485,26 +496,29 @@ const disabledDate = (time: Date) => {
   gap: 10px;
 }
 .slot-item {
-  border: 1px solid #dcdfe6;
+  border: 1px solid var(--border-color);
   border-radius: 4px;
   padding: 10px;
   text-align: center;
   cursor: pointer;
   transition: all 0.3s;
   position: relative;
+  background: rgba(255, 255, 255, 0.02);
+  color: var(--el-text-color-primary);
 }
 .slot-item:hover {
   border-color: #52C41A; /* 教师端绿色 */
+  background: rgba(82, 196, 26, 0.1);
 }
 .slot-item.selected {
-  background-color: #F0F9EB;
+  background-color: rgba(82, 196, 26, 0.15);
   border-color: #52C41A;
   color: #52C41A;
 }
 .slot-item.disabled {
-  background-color: #f5f7fa;
-  border-color: #e4e7ed;
-  color: #c0c4cc;
+  background-color: rgba(255, 255, 255, 0.05);
+  border-color: var(--border-color);
+  color: var(--el-text-color-disabled);
   cursor: not-allowed;
 }
 .slot-name {

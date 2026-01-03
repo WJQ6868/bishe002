@@ -1,13 +1,13 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue'
 import { ElMessage } from 'element-plus'
-import { Download } from '@element-plus/icons-vue'
+import { Download, View } from '@element-plus/icons-vue'
 import * as echarts from 'echarts'
 import {
   useStudentGrades,
   getGradeLevel,
   getGradeLevelColor,
-  StudentGradeRecord,
+  type StudentGradeRecord,
 } from '@/composables/useStudentGrades'
 
 const { grades, loading } = useStudentGrades()
@@ -98,13 +98,17 @@ const updateChart = () => {
   const xData = trendData.value.map((item) => item.semester)
   const seriesData = trendData.value.map((item) => (trendType.value === 'score' ? item.avgScore : item.avgGPA))
   chartInstance.setOption({
+    backgroundColor: 'transparent',
     title: {
       text: trendType.value === 'score' ? '成绩趋势图' : '绩点趋势图',
       left: 'center',
-      textStyle: { fontSize: 16, fontWeight: 600, color: '#303133' },
+      textStyle: { fontSize: 16, fontWeight: 600, color: '#fff' },
     },
     tooltip: {
       trigger: 'axis',
+      backgroundColor: 'rgba(20, 20, 20, 0.9)',
+      borderColor: 'rgba(255, 255, 255, 0.1)',
+      textStyle: { color: '#fff' },
       formatter: (params: any) => {
         const data = params[0]
         return `${data.name}<br/>${data.seriesName}: ${data.value}` 
@@ -113,20 +117,24 @@ const updateChart = () => {
     xAxis: {
       type: 'category',
       data: xData,
-      axisLabel: { rotate: 30 },
+      axisLabel: { rotate: 30, color: 'rgba(255,255,255,0.7)' },
+      axisLine: { lineStyle: { color: 'rgba(255,255,255,0.2)' } }
     },
     yAxis: {
       type: 'value',
       name: trendType.value === 'score' ? '成绩' : '绩点',
       min: trendType.value === 'score' ? 60 : 0,
       max: trendType.value === 'score' ? 100 : 4.5,
+      axisLabel: { color: 'rgba(255,255,255,0.7)' },
+      nameTextStyle: { color: 'rgba(255,255,255,0.7)' },
+      splitLine: { lineStyle: { color: 'rgba(255,255,255,0.1)' } }
     },
     series: [{
       name: trendType.value === 'score' ? '成绩' : '绩点',
       type: 'line',
       data: seriesData,
       smooth: true,
-      itemStyle: { color: '#409EFF' },
+      itemStyle: { color: '#00f2fe' },
       areaStyle: {
         color: {
           type: 'linear',
@@ -135,14 +143,15 @@ const updateChart = () => {
           x2: 0,
           y2: 1,
           colorStops: [
-            { offset: 0, color: 'rgba(64, 158, 255, 0.3)' },
-            { offset: 1, color: 'rgba(64, 158, 255, 0.05)' },
+            { offset: 0, color: 'rgba(0, 242, 254, 0.3)' },
+            { offset: 1, color: 'rgba(0, 242, 254, 0.05)' },
           ],
         },
       },
     }],
     toolbox: {
       feature: { saveAsImage: { title: '保存图片' } },
+      iconStyle: { borderColor: '#fff' }
     },
   })
 }
@@ -167,15 +176,12 @@ const viewDetail = (row: StudentGradeRecord) => {
 }
 
 const exportGrades = () => {
-  const targetSemester = currentSemester.value || semesters.value[0] || ''
   ElMessage.success('正在导出...')
   setTimeout(() => {
     ElMessage.success('导出成功')
   }, 800)
 }
 </script>
-
-
 
 <template>
   <div class="grade-management-container">
@@ -264,7 +270,7 @@ const exportGrades = () => {
         v-loading="loading"
         :data="semesterGrades"
         style="width: 100%"
-        :row-class-name="({ row }) => row.score < 60 ? 'fail-row' : ''"
+        :row-class-name="(scope: any) => scope.row.score < 60 ? 'fail-row' : ''"
       >
         <el-table-column prop="courseName" label="课程名称" min-width="150" />
         <el-table-column prop="courseId" label="课程号" width="120" />
@@ -348,7 +354,7 @@ const exportGrades = () => {
               {{ currentScoreDetail.score }}
             </span>
             <span style="margin-left: 20px">绩点：</span>
-            <span style="font-size: '20px', fontWeight: 'bold', color: '#409EFF'">
+            <span style="font-size: 20px; font-weight: bold; color: #00f2fe">
               {{ currentScoreDetail.gpa }}
             </span>
           </div>
@@ -375,7 +381,17 @@ const exportGrades = () => {
   flex-direction: column;
   gap: 20px;
   padding-bottom: 40px;
+  color: #fff;
 }
+
+.header-card, .chart-card, .table-card {
+  background: var(--card-bg) !important;
+  backdrop-filter: blur(10px) !important;
+  border: 1px solid var(--border-color) !important;
+  border-radius: 12px !important;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3) !important;
+}
+
 .header-card {
   flex-shrink: 0;
 }
@@ -388,33 +404,43 @@ const exportGrades = () => {
   flex-shrink: 0;
 }
 .stat-card {
-  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  background: var(--card-bg) !important;
+  backdrop-filter: blur(10px) !important;
+  border: 1px solid var(--border-color) !important;
+  border-radius: 12px !important;
   transition: all 0.3s;
 }
+
 .stat-card:hover {
-  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
   transform: translateY(-2px);
+  border-color: var(--primary-color) !important;
 }
+
 .stat-content {
   text-align: center;
   padding: 10px 0;
 }
+
 .stat-label {
   font-size: 12px;
-  color: #909399;
+  color: rgba(255, 255, 255, 0.6);
   margin-bottom: 10px;
 }
+
 .stat-value {
   font-size: 28px;
   font-weight: 600;
-  color: #303133;
+  color: #fff;
 }
+
 .stat-value.primary {
-  color: #409EFF;
+  color: #00f2fe;
 }
+
 .stat-value.success {
-  color: #52C41A;
+  color: #67c23a;
 }
+
 .chart-card {
   flex-shrink: 0;
 }
@@ -422,64 +448,85 @@ const exportGrades = () => {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  color: #fff;
 }
+
 .chart-container {
   height: 300px;
 }
+
 .table-card {
   overflow: visible;
 }
-/* 不及格行样式 */
+
+:deep(.el-table) {
+  background-color: transparent !important;
+  color: #fff !important;
+}
+
+:deep(.el-table__row) {
+  background-color: transparent !important;
+}
+
+:deep(.el-table th.el-table__cell) {
+  background-color: rgba(255, 255, 255, 0.05) !important;
+  color: #00f2fe !important;
+}
+
 :deep(.el-table .fail-row) {
-  background: #FEF0F0;
+  background: rgba(245, 108, 108, 0.1) !important;
 }
-/* 表格 hover 效果（学生端蓝色） */
+
 :deep(.el-table__body tr:hover > td) {
-  background-color: #E6F7FF !important;
+  background-color: rgba(0, 242, 254, 0.1) !important;
 }
-/* 成绩详情弹窗样式 */
+
 .detail-content {
   padding: 10px 0;
+  color: #fff;
 }
+
 .score-composition {
   margin-top: 25px;
 }
-.score-composition h4 {
+
+.score-composition h4, .teacher-comment h4 {
   margin-bottom: 15px;
-  color: #303133;
+  color: #00f2fe;
   font-size: 16px;
   font-weight: 600;
 }
+
 .composition-item {
   text-align: center;
   padding: 15px;
-  background: #F5F7FA;
+  background: rgba(255, 255, 255, 0.05);
   border-radius: 4px;
+  border: 1px solid var(--border-color);
 }
+
 .comp-label {
   font-size: 12px;
-  color: #909399;
+  color: rgba(255, 255, 255, 0.6);
   margin-bottom: 8px;
 }
+
 .comp-value {
   font-size: 24px;
   font-weight: 600;
-  color: #409EFF;
+  color: #00f2fe;
 }
+
 .final-score {
   margin-top: 20px;
   text-align: center;
   padding: 15px;
-  background: #E6F7FF;
+  background: rgba(0, 242, 254, 0.1);
   border-radius: 4px;
+  border: 1px solid rgba(0, 242, 254, 0.2);
 }
+
 .teacher-comment {
   margin-top: 25px;
-}
-.teacher-comment h4 {
-  margin-bottom: 10px;
-  color: #303133;
-  font-size: 16px;
-  font-weight: 600;
 }
 </style>

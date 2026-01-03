@@ -3,7 +3,6 @@ from fastapi.middleware.cors import CORSMiddleware
 from .routers import (
     ai_qa,
     analysis,
-    attendance,
     auth,
     calendar,
     cert,
@@ -24,6 +23,8 @@ from .routers import (
     user,
     work,
     academic,
+    admin_ai,
+    ai_portal,
 )
 from fastapi.staticfiles import StaticFiles
 import os
@@ -40,6 +41,7 @@ from .models.student import Student
 from .models import admin_user
 from .dependencies.auth import get_password_hash
 from .models.academic import AcademicCollege, AcademicMajor, AcademicClass, AcademicStudent, AcademicClassHeadTeacher
+from .models import ai_config  # noqa: F401
 
 # Configure logging at startup
 configure_logging()
@@ -126,10 +128,77 @@ async def startup():
         if "update_time" not in cols:
             await conn.execute(text("ALTER TABLE academic_students ADD COLUMN update_time DATETIME"))
             await conn.execute(text("UPDATE academic_students SET update_time = created_at WHERE update_time IS NULL"))
+
+            # Ensure new columns for teacher_kb_documents (AI 教师私有知识库)
+            pragma_cols = await conn.execute(text("PRAGMA table_info('teacher_kb_documents')"))
+            cols = [row[1] for row in pragma_cols]
+            if cols:  # 表存在时才做兼容升级
+                if "course_id" not in cols:
+                    await conn.execute(text("ALTER TABLE teacher_kb_documents ADD COLUMN course_id INTEGER"))
+                if "updated_at" not in cols:
+                    await conn.execute(text("ALTER TABLE teacher_kb_documents ADD COLUMN updated_at DATETIME"))
+                    await conn.execute(text("UPDATE teacher_kb_documents SET updated_at = created_at WHERE updated_at IS NULL"))
+
+        # Ensure new columns for ai_kb_subjects
+        pragma_cols = await conn.execute(text("PRAGMA table_info('ai_kb_subjects')"))
+        cols = [row[1] for row in pragma_cols]
+        if cols:
+            if "stage" not in cols:
+                await conn.execute(text("ALTER TABLE ai_kb_subjects ADD COLUMN stage VARCHAR(50)"))
+            if "enabled" not in cols:
+                await conn.execute(text("ALTER TABLE ai_kb_subjects ADD COLUMN enabled BOOLEAN DEFAULT 1"))
+                await conn.execute(text("UPDATE ai_kb_subjects SET enabled = 1 WHERE enabled IS NULL"))
+
+        # Ensure new columns for ai_kb_documents
+        pragma_cols = await conn.execute(text("PRAGMA table_info('ai_kb_documents')"))
+        cols = [row[1] for row in pragma_cols]
+        if cols:
+            if "enabled" not in cols:
+                await conn.execute(text("ALTER TABLE ai_kb_documents ADD COLUMN enabled BOOLEAN DEFAULT 1"))
+                await conn.execute(text("UPDATE ai_kb_documents SET enabled = 1 WHERE enabled IS NULL"))
+            if "updated_at" not in cols:
+                await conn.execute(text("ALTER TABLE ai_kb_documents ADD COLUMN updated_at DATETIME"))
+                await conn.execute(text("UPDATE ai_kb_documents SET updated_at = created_at WHERE updated_at IS NULL"))
+            if "knowledge_base_id" not in cols:
+                await conn.execute(text("ALTER TABLE ai_kb_documents ADD COLUMN knowledge_base_id INTEGER"))
+
+        # Ensure new columns for ai_model_kb_links
+        pragma_cols = await conn.execute(text("PRAGMA table_info('ai_model_kb_links')"))
+        cols = [row[1] for row in pragma_cols]
+        if cols:
+            if "priority" not in cols:
+                await conn.execute(text("ALTER TABLE ai_model_kb_links ADD COLUMN priority INTEGER DEFAULT 0"))
+                await conn.execute(text("UPDATE ai_model_kb_links SET priority = 0 WHERE priority IS NULL"))
+
+        # Ensure new columns for ai_model_apis
+        pragma_cols = await conn.execute(text("PRAGMA table_info('ai_model_apis')"))
+        cols = [row[1] for row in pragma_cols]
+        if cols:
+            if "api_header" not in cols:
+                await conn.execute(text("ALTER TABLE ai_model_apis ADD COLUMN api_header TEXT"))
+            if "api_version" not in cols:
+                await conn.execute(text("ALTER TABLE ai_model_apis ADD COLUMN api_version VARCHAR(50)"))
+            if "provider_brand" not in cols:
+                await conn.execute(text("ALTER TABLE ai_model_apis ADD COLUMN provider_brand VARCHAR(50)"))
+            if "temperature" not in cols:
+                await conn.execute(text("ALTER TABLE ai_model_apis ADD COLUMN temperature FLOAT"))
+            if "max_output_tokens" not in cols:
+                await conn.execute(text("ALTER TABLE ai_model_apis ADD COLUMN max_output_tokens INTEGER"))
+
+        # Ensure new columns for student_course_ai_selections
+        pragma_cols = await conn.execute(text("PRAGMA table_info('student_course_ai_selections')"))
+        cols = [row[1] for row in pragma_cols]
+        if cols:
+            if "custom_model_id" not in cols:
+                await conn.execute(text("ALTER TABLE student_course_ai_selections ADD COLUMN custom_model_id INTEGER"))
     # 仅创建数据表，严格不写入任何模拟数据
     # 引入 Admin 模型以确保管理员表被创建
     from .models.admin import Admin  # noqa: F401
     async with AsyncSessionLocal() as db:
+        # 内置 AI 模型 API 预设：幂等写入（不重复、不覆盖已有配置）。
+        # API Key 建议通过环境变量注入，避免把密钥写进仓库。
+        from .models.ai_config import AiKnowledgeBase, AiModelApi, AiWorkflowApp  # noqa: WPS433
+
         defaults = [
             {"username": "800001", "role": "admin", "name": "Admin Office", "dept": "Academic Affairs"},
             {"username": "100001", "role": "teacher", "name": "Teacher Zhang", "dept": "Computer Science"},
@@ -198,6 +267,172 @@ async def startup():
                 legacy_s.grade = str(s.grade_id) if s.grade_id else legacy_s.grade
             else:
                 db.add(Student(id=s.student_no, name=s.name, major=s.major, grade=str(s.grade_id) if s.grade_id else None))
+
+        async def _ensure_ai_model_api(
+            *,
+            name: str,
+            provider: str,
+            model_name: str,
+            endpoint: str,
+            api_key_env: str | None,
+            make_default_if_none: bool = False,
+        ) -> None:
+            ep = (endpoint or "").strip().rstrip("/")
+            if not ep:
+                return
+
+            existed = (
+                await db.execute(
+                    select(AiModelApi).where(
+                        AiModelApi.provider == provider,
+                        AiModelApi.model_name == model_name,
+                        AiModelApi.endpoint == ep,
+                    )
+                )
+            ).scalars().first()
+
+            env_key = (os.getenv(api_key_env) or "").strip() if api_key_env else ""
+
+            if existed:
+                # 若原本是占位 key 且环境变量提供了真实 key，则自动填充。
+                if existed.api_key in {"", "__PLEASE_SET__", "__PLEASE_SET__ ", "__PLACEHOLDER__"} and env_key:
+                    existed.api_key = env_key
+                # 不自动启用，避免误用；由管理员在前端启用。
+                return
+
+            # 只有在系统里还没有任何默认模型时，才把预设标为默认。
+            has_default = (
+                await db.execute(select(func.count(AiModelApi.id)).where(AiModelApi.is_default == True))
+            ).scalar() or 0
+            is_default = bool(make_default_if_none and int(has_default) == 0)
+
+            db.add(
+                AiModelApi(
+                    name=name,
+                    provider=provider,
+                    model_name=model_name,
+                    endpoint=ep,
+                    api_key=env_key or "__PLEASE_SET__",
+                    timeout_seconds=30,
+                    quota_per_hour=0,
+                    enabled=False,
+                    is_default=is_default,
+                )
+            )
+
+        async def _ensure_ai_knowledge_base(
+            *,
+            slug: str,
+            name: str,
+            feature: str,
+            owner_type: str = "system",
+            is_default: bool = False,
+        ) -> AiKnowledgeBase:
+            existing = (
+                await db.execute(select(AiKnowledgeBase).where(AiKnowledgeBase.slug == slug))
+            ).scalars().first()
+            if existing:
+                return existing
+            kb = AiKnowledgeBase(
+                slug=slug,
+                name=name,
+                feature=feature,
+                owner_type=owner_type,
+                is_default=is_default,
+            )
+            db.add(kb)
+            await db.flush()
+            return kb
+
+        async def _ensure_workflow_app(
+            *,
+            code: str,
+            name: str,
+            app_type: str,
+            kb_slug: str | None = None,
+        ) -> AiWorkflowApp:
+            app = (await db.execute(select(AiWorkflowApp).where(AiWorkflowApp.code == code))).scalars().first()
+            if app:
+                return app
+            kb_id = None
+            if kb_slug:
+                kb = (
+                    await db.execute(select(AiKnowledgeBase).where(AiKnowledgeBase.slug == kb_slug))
+                ).scalars().first()
+                kb_id = kb.id if kb else None
+            app = AiWorkflowApp(
+                code=code,
+                name=name,
+                type=app_type,
+                knowledge_base_id=kb_id,
+                status="enabled",
+            )
+            db.add(app)
+            await db.flush()
+            return app
+
+        # 预设清单（只放“后端已支持的 provider”）
+        await _ensure_ai_model_api(
+            name="通义千问（Qwen）",
+            provider="dashscope_openai",
+            model_name="qwen-plus",
+            endpoint="https://dashscope.aliyuncs.com/compatible-mode/v1",
+            api_key_env="AI_PRESET_DASHSCOPE_API_KEY",
+            make_default_if_none=True,
+        )
+        await _ensure_ai_model_api(
+            name="通义千问 Max（Qwen）",
+            provider="dashscope_openai",
+            model_name="qwen-max",
+            endpoint="https://dashscope.aliyuncs.com/compatible-mode/v1",
+            api_key_env="AI_PRESET_DASHSCOPE_API_KEY",
+            make_default_if_none=False,
+        )
+        await _ensure_ai_model_api(
+            name="火山方舟（Ark）",
+            provider="ark_responses",
+            model_name="deepseek-v3",
+            endpoint="https://ark.cn-beijing.volces.com/api/v3",
+            api_key_env="AI_PRESET_ARK_API_KEY",
+            make_default_if_none=False,
+        )
+
+        kb_customer = await _ensure_ai_knowledge_base(
+            slug="customer-service-base",
+            name="客服知识库",
+            feature="customer_service",
+            is_default=True,
+        )
+        kb_course = await _ensure_ai_knowledge_base(
+            slug="course-assistant-base",
+            name="课程助手知识库",
+            feature="course_assistant",
+        )
+        kb_lesson = await _ensure_ai_knowledge_base(
+            slug="lesson-plan-base",
+            name="智能教案知识库",
+            feature="lesson_plan",
+        )
+        await db.commit()
+
+        await _ensure_workflow_app(
+            code="customer_service",
+            name="AI客服",
+            app_type="customer_service",
+            kb_slug="customer-service-base",
+        )
+        await _ensure_workflow_app(
+            code="course_assistant",
+            name="AI课程助手",
+            app_type="course_assistant",
+            kb_slug="course-assistant-base",
+        )
+        await _ensure_workflow_app(
+            code="lesson_plan",
+            name="智能教案",
+            app_type="lesson_plan",
+            kb_slug="lesson-plan-base",
+        )
 
         await db.commit()
 
@@ -356,12 +591,13 @@ _routers = [
     course.router,
     schedule.router,
     academic.router,
+    admin_ai.router,
     ai_qa.router,
+    ai_portal.router,
     analysis.router,
     message.router,   # 即时通讯路由
     friend.router,    # 好友管理路由
     leave.router,     # 请假管理路由
-    attendance.router,
     homework.router,
     work.router,
     calendar.router,

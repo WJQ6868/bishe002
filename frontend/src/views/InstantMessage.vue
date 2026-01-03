@@ -132,7 +132,7 @@ const initSocketIO = () => {
     }
   })
   
-  socket.on('friend_added', (data: any) => {
+  socket.on('friend_added', () => {
     // 刷新联系人列表
     loadContacts()
   })
@@ -150,7 +150,7 @@ const initSocketIO = () => {
 
 const loadContacts = async () => {
   try {
-    const res = await axios.get('/api/chat/contacts')
+    const res = await axios.get('/chat/contacts')
     contacts.value = (res.data?.data?.contacts || []).map((item: any) => ({
       user_id: item.user_id,
       name: item.name,
@@ -171,7 +171,7 @@ const loadContacts = async () => {
 
 const loadUnread = async () => {
   try {
-    const res = await axios.get('/api/chat/unread')
+    const res = await axios.get('/chat/unread')
     const details = res.data?.data?.details || {}
     contacts.value.forEach((contact) => {
       contact.unread = details[contact.user_id] || 0
@@ -185,7 +185,7 @@ const loadMessages = async () => {
   if (!currentContact.value) return
   loadingHistory.value = true
   try {
-    const res = await axios.get('/api/chat/history', {
+    const res = await axios.get('/chat/history', {
       params: { to_id: currentContact.value.user_id, page: 1, size: 100 }
     })
     messages.value = res.data?.data?.list || []
@@ -201,7 +201,7 @@ const loadMessages = async () => {
 
 const markConversationRead = async (targetId: number) => {
   try {
-    await axios.post('/api/chat/read', {
+    await axios.post('/chat/read', {
       user_id: currentUser.id,
       target_id: targetId,
     })
@@ -371,9 +371,10 @@ const handleRefreshContacts = () => {
 
 
 <template>
-  <div class="im-container">
-    <!-- 左侧联系人列表 -->
-    <div class="contacts-panel">
+  <div class="im-page">
+    <div class="im-container">
+      <!-- 左侧联系人列表 -->
+      <div class="contacts-panel">
       <div class="panel-header">
         <el-badge :value="pendingFriendRequests" :hidden="pendingFriendRequests === 0" :max="99">
           <h3>消息</h3>
@@ -556,26 +557,34 @@ const handleRefreshContacts = () => {
       v-model:visible="showFriendDialog"
       @refresh-contacts="handleRefreshContacts"
     />
+    </div>
   </div>
 </template>
 
 <style scoped>
+.im-page {
+  background: var(--app-bg, #0b0f18);
+  min-height: calc(100vh - 90px);
+  padding: 12px;
+}
+
 .im-container {
   display: flex;
   height: calc(100vh - 120px);
-  background: #fff;
+  background: rgba(17, 24, 39, 0.85);
   border-radius: 8px;
   overflow: hidden;
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.35);
+  border: 1px solid var(--border-color, #1f2a3d);
 }
 
 /* 左侧联系人列表 */
 .contacts-panel {
   width: 300px;
-  border-right: 1px solid #E4E7ED;
+  border-right: 1px solid rgba(255,255,255,0.06);
   display: flex;
   flex-direction: column;
-  background: #FAFAFA;
+  background: rgba(12, 17, 28, 0.9);
 }
 
 .panel-header {
@@ -583,13 +592,13 @@ const handleRefreshContacts = () => {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  border-bottom: 1px solid #E4E7ED;
+  border-bottom: 1px solid rgba(255,255,255,0.06);
 }
 
 .panel-header h3 {
   margin: 0;
   font-size: 18px;
-  color: #303133;
+  color: #e8f5ff;
 }
 
 .search-bar {
@@ -611,11 +620,11 @@ const handleRefreshContacts = () => {
 }
 
 .contact-item:hover {
-  background: #F5F7FA;
+  background: rgba(0, 242, 254, 0.08);
 }
 
 .contact-item.active {
-  background: #E6F7FF;
+  background: rgba(0, 242, 254, 0.15);
 }
 
 .avatar-wrapper {
@@ -667,17 +676,17 @@ const handleRefreshContacts = () => {
 .contact-header .name {
   font-size: 14px;
   font-weight: 500;
-  color: #303133;
+  color: #e6f0ff;
 }
 
 .contact-header .time {
   font-size: 12px;
-  color: #909399;
+  color: rgba(255,255,255,0.45);
 }
 
 .last-message {
   font-size: 13px;
-  color: #909399;
+  color: rgba(255,255,255,0.6);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -699,7 +708,7 @@ const handleRefreshContacts = () => {
 .empty-contacts {
   text-align: center;
   padding: 40px;
-  color: #909399;
+  color: rgba(255,255,255,0.5);
 }
 
 /* 右侧聊天区 */
@@ -707,6 +716,7 @@ const handleRefreshContacts = () => {
   flex: 1;
   display: flex;
   flex-direction: column;
+  background: rgba(17, 24, 39, 0.8);
 }
 
 .chat-panel.empty-state {
@@ -714,7 +724,7 @@ const handleRefreshContacts = () => {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  color: #909399;
+  color: rgba(255,255,255,0.5);
 }
 
 .chat-panel.empty-state p {
@@ -733,11 +743,11 @@ const handleRefreshContacts = () => {
 /* 聊天头部 */
 .chat-header {
   padding: 16px 20px;
-  border-bottom: 1px solid #E4E7ED;
+  border-bottom: 1px solid rgba(255,255,255,0.06);
   display: flex;
   justify-content: space-between;
   align-items: center;
-  background: #fff;
+  background: transparent;
 }
 
 .contact-profile {
@@ -759,7 +769,7 @@ const handleRefreshContacts = () => {
 .profile-info .name {
   font-size: 16px;
   font-weight: 500;
-  color: #303133;
+  color: #e8f5ff;
 }
 
 .profile-info .status {
@@ -771,7 +781,7 @@ const handleRefreshContacts = () => {
   flex: 1;
   overflow-y: auto;
   padding: 20px;
-  background: #F5F7FA;
+  background: transparent;
 }
 
 .message-item {
@@ -796,13 +806,13 @@ const handleRefreshContacts = () => {
 }
 
 .message-item:not(.is-self) .bubble-content {
-  background: #fff;
-  color: #303133;
+  background: rgba(255,255,255,0.08);
+  color: #e6f0ff;
   border-top-left-radius: 2px;
 }
 
 .message-item.is-self .bubble-content {
-  background: #409EFF;
+  background: linear-gradient(135deg, #00f2fe, #0066ff);
   color: #fff;
   border-top-right-radius: 2px;
 }
@@ -813,7 +823,7 @@ const handleRefreshContacts = () => {
   gap: 8px;
   margin-top: 4px;
   font-size: 11px;
-  color: #909399;
+  color: rgba(255,255,255,0.55);
 }
 
 .message-item.is-self .message-meta {
@@ -836,8 +846,8 @@ const handleRefreshContacts = () => {
 /* 输入区域 */
 .input-area {
   padding: 12px 16px;
-  border-top: 1px solid #E4E7ED;
-  background: #fff;
+  border-top: 1px solid rgba(255,255,255,0.06);
+  background: rgba(0,0,0,0.25);
 }
 
 .input-tools {
@@ -864,8 +874,8 @@ const handleRefreshContacts = () => {
   left: 0;
   width: 320px;
   max-height: 280px;
-  background: #fff;
-  border: 1px solid #E4E7ED;
+  background: #0f172a;
+  border: 1px solid rgba(255,255,255,0.08);
   border-radius: 8px;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
   z-index: 1000;
@@ -905,7 +915,7 @@ const handleRefreshContacts = () => {
 }
 
 .emoji-item:hover {
-  background: #ECF5FF;
+  background: rgba(0, 242, 254, 0.08);
   transform: scale(1.2);
 }
 </style>

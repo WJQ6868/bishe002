@@ -4,8 +4,8 @@
  * 包含：申请表单、历史记录、撤回功能
  */
 import { ref, reactive, onMounted } from 'vue'
-import { ElMessage, ElMessageBox, UploadFile } from 'element-plus'
-import { Plus, Refresh, UploadFilled } from '@element-plus/icons-vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
+import { UploadFilled } from '@element-plus/icons-vue'
 import axios from 'axios'
 
 // --- 类型定义 ---
@@ -47,7 +47,7 @@ const loading = ref(false)
 const courseLoading = ref(false)
 const submitting = ref(false)
 
-const studentId = parseInt(localStorage.getItem('user_id') || '0')
+// const studentId = parseInt(localStorage.getItem('user_id') || '0')
 const uploadHeaders = { Authorization: `Bearer ${localStorage.getItem('token')}` }
 
 // --- 初始化 ---
@@ -248,7 +248,7 @@ const formatTime = (iso: string) => {
                 range-separator="至"
                 start-placeholder="开始时间"
                 end-placeholder="结束时间"
-                :disabled-date="(time) => time.getTime() < Date.now() - 8.64e7"
+                :disabled-date="(time: Date) => time.getTime() < Date.now() - 8.64e7"
               />
             </el-form-item>
             
@@ -325,7 +325,9 @@ const formatTime = (iso: string) => {
 <style scoped>
 .leave-container {
   padding: 20px;
-  background: #fff;
+  background: var(--card-bg);
+  backdrop-filter: blur(10px);
+  border: 1px solid var(--border-color);
   border-radius: 8px;
   min-height: calc(100vh - 120px);
 }
@@ -337,22 +339,30 @@ const formatTime = (iso: string) => {
 
 .panel-header {
   margin-bottom: 30px;
-  border-bottom: 1px solid #EBEEF5;
+  border-bottom: 1px solid var(--border-color);
   padding-bottom: 15px;
 }
 
 .panel-header h3 {
   margin: 0 0 10px 0;
-  color: #303133;
+  color: #fff;
 }
 
 .tips {
-  color: #909399;
+  color: rgba(255, 255, 255, 0.6);
   font-size: 14px;
   margin: 0;
 }
 
 .leave-form {
   margin-top: 20px;
+}
+
+:deep(.el-tabs__item) {
+  color: rgba(255, 255, 255, 0.7) !important;
+}
+
+:deep(.el-tabs__item.is-active) {
+  color: var(--primary-color) !important;
 }
 </style>

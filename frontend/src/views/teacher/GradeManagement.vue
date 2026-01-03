@@ -525,6 +525,6 @@ watch(studentScores, () => {
 }
 /* 教师端色彩规范 */
 :deep(.el-table__body tr:hover > td) {
-  background-color: #F0F9EB !important;
+  background-color: rgba(255, 255, 255, 0.05) !important;
 }
 </style>

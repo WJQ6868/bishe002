@@ -224,7 +224,7 @@ const submitAudit = async (result: 'approved' | 'rejected') => {
   try {
     await Promise.all(
       targets.map((id) =>
-        axios.put('/api/service/apply/approve', {
+        axios.put('/service/apply/approve', {
           id,
           result,
           opinion: result === 'rejected' ? rejectReason.value : undefined

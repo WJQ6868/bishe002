@@ -89,38 +89,6 @@ const apiList = ref<ApiItem[]>([
     enabled: true,
     isDefault: true,
     lastTest: 'none'
-  },
-  {
-    id: 'api-ca-1',
-    feature: 'course',
-    name: 'DeepSeek 检索',
-    model: 'deepseek-r1',
-    endpoint: 'https://api.deepseek.com/v1/chat/completions',
-    apiKey: '',
-    headers: 'Content-Type: application/json',
-    timeout: 30,
-    retry: 2,
-    rateLimit: 300,
-    concurrency: 10,
-    enabled: true,
-    isDefault: true,
-    lastTest: 'none'
-  },
-  {
-    id: 'api-lp-1',
-    feature: 'lesson',
-    name: '豆包生成',
-    model: 'doubao-pro',
-    endpoint: 'https://ark.cn-beijing.volces.com/api/v3/chat/completions',
-    apiKey: '',
-    headers: 'Content-Type: application/json',
-    timeout: 45,
-    retry: 2,
-    rateLimit: 200,
-    concurrency: 8,
-    enabled: true,
-    isDefault: true,
-    lastTest: 'none'
   }
 ])
 
@@ -141,7 +109,7 @@ const featureConfigs: Record<FeatureKey, FeatureConfig> = reactive({
   },
   course: {
     enabled: true,
-    defaultApiId: 'api-ca-1',
+    defaultApiId: 'api-cs-1',
     timeout: 30,
     retry: 2,
     rateLimit: 200,
@@ -157,7 +125,7 @@ const featureConfigs: Record<FeatureKey, FeatureConfig> = reactive({
   },
   lesson: {
     enabled: true,
-    defaultApiId: 'api-lp-1',
+    defaultApiId: 'api-cs-1',
     timeout: 45,
     retry: 2,
     rateLimit: 120,
@@ -465,7 +433,7 @@ const featureName = (key: FeatureKey) => {
             <h3>面向学生的知识问答</h3>
             <p>配置 API、知识库规则、阈值与日志导出</p>
           </div>
-          <el-switch v-model="featureConfigs.customer.enabled" @change="(val) => toggleFeature('customer', val as boolean)" />
+          <el-switch v-model="featureConfigs.customer.enabled" @change="(val: any) => toggleFeature('customer', val as boolean)" />
         </div>
         <div class="feature-body">
           <el-card shadow="never" class="config-card">
@@ -554,7 +522,7 @@ const featureName = (key: FeatureKey) => {
             <h3>面向教师的资料检索问答</h3>
             <p>配置检索 API、资料审核、权限与频次</p>
           </div>
-          <el-switch v-model="featureConfigs.course.enabled" @change="(val) => toggleFeature('course', val as boolean)" />
+          <el-switch v-model="featureConfigs.course.enabled" @change="(val: any) => toggleFeature('course', val as boolean)" />
         </div>
         <div class="feature-body">
           <el-card shadow="never" class="config-card">
@@ -642,7 +610,7 @@ const featureName = (key: FeatureKey) => {
             <h3>面向教师的教案转 PPT</h3>
             <p>配置生成类 API、模板与频次限制</p>
           </div>
-          <el-switch v-model="featureConfigs.lesson.enabled" @change="(val) => toggleFeature('lesson', val as boolean)" />
+          <el-switch v-model="featureConfigs.lesson.enabled" @change="(val: any) => toggleFeature('lesson', val as boolean)" />
         </div>
         <div class="feature-body">
           <el-card shadow="never" class="config-card">
@@ -876,40 +844,225 @@ export default defineComponent({ name: 'AIConfig' })
 
 <style scoped>
 .ai-settings-page {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
+  padding: 20px;
+  min-height: 100vh;
+  background-color: transparent;
+  color: #fff;
 }
+
 .page-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  background: #fff;
-  padding: 16px 20px;
-  border-radius: 6px;
-  box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+  margin-bottom: 20px;
+  background: var(--card-bg);
+  backdrop-filter: blur(10px);
+  padding: 20px;
+  border-radius: 8px;
+  border: 1px solid var(--border-color);
 }
-.page-header h1 { margin: 0; font-size: 22px; }
-.subtitle { margin: 6px 0 0; color: #909399; font-size: 13px; }
-.overview-card { margin-bottom: 10px; }
-.overview-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 12px; }
-.card-head { display: flex; justify-content: space-between; align-items: center; }
-.card-title { margin: 0; font-size: 16px; font-weight: 600; }
-.card-sub { margin: 6px 0 0; color: #909399; font-size: 13px; }
-.card-metrics { display: flex; gap: 24px; margin: 14px 0; }
-.metric-value { margin: 0; font-size: 22px; font-weight: bold; }
-.metric-value.warn { color: #F56C6C; }
-.metric-label { margin: 4px 0 0; color: #909399; font-size: 12px; }
-.card-actions { display: flex; gap: 10px; }
-.tab-label { display: inline-flex; align-items: center; gap: 6px; }
-.feature-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
-.title-block h3 { margin: 0 0 4px; }
-.title-block p { margin: 0; color: #909399; }
-.feature-body { display: flex; flex-direction: column; gap: 12px; }
-.config-card { width: 100%; }
-.card-header { display: flex; justify-content: space-between; align-items: center; }
-.card-title-row { font-weight: 600; }
-.config-form { padding: 10px 0 0; }
-.hint { color: #909399; font-size: 12px; margin-left: 6px; }
-.empty-log { text-align: center; padding: 20px; color: #909399; }
+
+.page-header h1 {
+  margin: 0;
+  font-size: 24px;
+  color: #fff;
+}
+
+.subtitle {
+  margin: 8px 0 0;
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 14px;
+}
+
+.overview-card {
+  margin-bottom: 20px;
+}
+
+.overview-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 20px;
+}
+
+:deep(.el-card) {
+  background: var(--card-bg) !important;
+  backdrop-filter: blur(10px);
+  border: 1px solid var(--border-color) !important;
+  color: #fff !important;
+}
+
+.card-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 15px;
+}
+
+.card-title {
+  font-size: 16px;
+  font-weight: bold;
+  margin: 0 0 4px;
+  color: #fff;
+}
+
+.card-sub {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.5);
+  margin: 0;
+}
+
+.card-metrics {
+  display: flex;
+  gap: 30px;
+  margin-bottom: 15px;
+}
+
+.metric-value {
+  font-size: 24px;
+  font-weight: bold;
+  margin: 0;
+  color: var(--primary-color);
+}
+
+.metric-value.warn {
+  color: #f56c6c;
+}
+
+.metric-label {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.5);
+  margin: 4px 0 0;
+}
+
+.card-actions {
+  display: flex;
+  gap: 10px;
+  border-top: 1px solid var(--border-color);
+  padding-top: 10px;
+}
+
+.feature-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+  background: var(--card-bg);
+  padding: 15px 20px;
+  border-radius: 8px;
+  border: 1px solid var(--border-color);
+  backdrop-filter: blur(10px);
+}
+
+.title-block h3 {
+  margin: 0 0 4px;
+  font-size: 18px;
+  color: #fff;
+}
+
+.title-block p {
+  margin: 0;
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.feature-body {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.config-card {
+  border: 1px solid var(--border-color);
+  background: var(--card-bg);
+}
+
+.card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.card-title-row {
+  font-size: 16px;
+  font-weight: bold;
+  color: #fff;
+}
+
+.hint {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.5);
+  margin: 4px 0 0;
+}
+
+.config-form {
+  max-width: 800px;
+}
+
+.empty-log {
+  text-align: center;
+  padding: 20px;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+/* Tabs Overrides */
+:deep(.el-tabs--border-card) {
+  background: var(--card-bg) !important;
+  border: 1px solid var(--border-color) !important;
+  backdrop-filter: blur(10px);
+}
+
+:deep(.el-tabs--border-card > .el-tabs__header) {
+  background-color: rgba(255, 255, 255, 0.05) !important;
+  border-bottom: 1px solid var(--border-color) !important;
+}
+
+:deep(.el-tabs--border-card > .el-tabs__header .el-tabs__item) {
+  color: rgba(255, 255, 255, 0.7) !important;
+}
+
+:deep(.el-tabs--border-card > .el-tabs__header .el-tabs__item.is-active) {
+  background-color: rgba(255, 255, 255, 0.1) !important;
+  color: var(--primary-color) !important;
+  border-right-color: var(--border-color) !important;
+  border-left-color: var(--border-color) !important;
+}
+
+/* Table Overrides */
+:deep(.el-table) {
+  background-color: transparent !important;
+  color: #fff !important;
+}
+
+:deep(.el-table th.el-table__cell) {
+  background-color: rgba(255, 255, 255, 0.05) !important;
+  color: var(--primary-color) !important;
+}
+
+:deep(.el-table tr) {
+  background-color: transparent !important;
+}
+
+:deep(.el-table__body tr:hover > td) {
+  background-color: rgba(255, 255, 255, 0.1) !important;
+}
+
+/* Dialog Overrides */
+:deep(.el-dialog) {
+  background: rgba(30, 30, 30, 0.95) !important;
+  backdrop-filter: blur(20px);
+  border: 1px solid var(--border-color) !important;
+}
+
+:deep(.el-dialog__title) {
+  color: #fff !important;
+}
+
+:deep(.el-form-item__label) {
+  color: rgba(255, 255, 255, 0.8) !important;
+}
+
+:deep(.el-input__inner) {
+  background-color: rgba(255, 255, 255, 0.05) !important;
+  color: #fff !important;
+}
 </style>

@@ -224,9 +224,11 @@ const formatTime = (iso: string) => {
 <style scoped>
 .work-container {
   padding: 20px;
-  background: #fff;
+  background: var(--card-bg);
+  backdrop-filter: blur(10px);
   border-radius: 8px;
   min-height: calc(100vh - 120px);
+  border: 1px solid var(--border-color);
 }
 
 .date-cell-content {
@@ -248,7 +250,7 @@ const formatTime = (iso: string) => {
 
 .schedule-content {
   margin-left: 4px;
-  color: #606266;
+  color: var(--el-text-color-secondary);
 }
 
 .adjust-panel {
@@ -260,14 +262,51 @@ const formatTime = (iso: string) => {
 .form-card {
   width: 600px;
   padding: 30px;
-  border: 1px solid #EBEEF5;
+  border: 1px solid var(--border-color);
   border-radius: 8px;
-  box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.1);
+  background: rgba(255, 255, 255, 0.03);
 }
 
 .form-card h3 {
   text-align: center;
   margin-bottom: 30px;
-  color: #303133;
+  color: var(--el-text-color-primary);
+}
+
+:deep(.el-calendar) {
+  background: transparent;
+  border: none;
+}
+
+:deep(.el-calendar__header) {
+  background: transparent;
+  border-bottom: 1px solid var(--border-color);
+}
+
+:deep(.el-calendar-table thead th) {
+  background: transparent;
+  color: var(--el-text-color-secondary);
+}
+
+:deep(.el-calendar-table td) {
+  border: 1px solid var(--border-color);
+}
+
+:deep(.el-calendar-table .el-calendar-day) {
+  background: rgba(255, 255, 255, 0.02);
+  color: var(--el-text-color-primary);
+}
+
+:deep(.el-calendar-table .el-calendar-day:hover) {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+:deep(.el-calendar-table .is-today .el-calendar-day) {
+  background: rgba(64, 158, 255, 0.15);
+  color: #409EFF;
+}
+
+:deep(.el-calendar-table .is-selected .el-calendar-day) {
+  background: rgba(64, 158, 255, 0.2);
 }
 </style>

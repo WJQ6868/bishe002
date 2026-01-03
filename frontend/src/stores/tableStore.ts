@@ -1,4 +1,4 @@
-import { defineStore } from 'pinia'
+Ôªøimport { defineStore } from 'pinia'
 import axios from 'axios'
 
 interface TableState {
@@ -23,7 +23,7 @@ export const useTableStore = defineStore('tableStore', {
       }
       this.loading = true
       try {
-        const res = await axios.get('/api/data/tables', {
+        const res = await axios.get('/data/tables', {
           params: { names: pending.join(',') }
         })
         const tables = res.data?.tables || {}
@@ -33,7 +33,7 @@ export const useTableStore = defineStore('tableStore', {
         })
         this.lastError = null
       } catch (error: any) {
-        this.lastError = error?.response?.data?.detail || error?.message || 'º”‘ÿ ˝æ› ß∞‹'
+        this.lastError = error?.response?.data?.detail || error?.message || 'Âä†ËΩΩÊï∞ÊçÆÂ§±Ë¥•'
         throw error
       } finally {
         this.loading = false
@@ -53,3 +53,4 @@ export const useTableStore = defineStore('tableStore', {
     }
   }
 })
+

@@ -313,21 +313,23 @@ const submitCreate = async () => {
   justify-content: space-between;
   align-items: center;
   margin-bottom: 30px;
-  background: white;
+  background: var(--card-bg);
+  backdrop-filter: blur(10px);
   padding: 20px;
   border-radius: 8px;
-  box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.05);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+  border: 1px solid var(--border-color);
 }
 
 .title-area h2 {
   margin: 0;
   font-size: 24px;
-  color: #303133;
+  color: var(--el-text-color-primary);
 }
 
 .subtitle {
   margin: 5px 0 0;
-  color: #909399;
+  color: rgba(255, 255, 255, 0.6);
   font-size: 14px;
 }
 
@@ -367,28 +369,30 @@ const submitCreate = async () => {
   align-items: center;
   gap: 6px;
   padding: 8px 16px;
-  background: white;
+  background: var(--card-bg);
+  backdrop-filter: blur(10px);
   border-radius: 20px;
   cursor: pointer;
   transition: all 0.3s;
-  border: 1px solid #dcdfe6;
-  color: #606266;
+  border: 1px solid var(--border-color);
+  color: var(--el-text-color-regular);
 }
 
 .category-item:hover, .category-item.active {
-  color: #409eff;
+  color: #fff;
   border-color: #409eff;
-  background: #ecf5ff;
+  background: rgba(64, 158, 255, 0.2);
 }
 
 .link-card {
-  background: white;
+  background: var(--card-bg);
+  backdrop-filter: blur(10px);
   border-radius: 8px;
   padding: 15px;
   margin-bottom: 20px;
   cursor: pointer;
   transition: all 0.3s;
-  border: 1px solid #ebeef5;
+  border: 1px solid var(--border-color);
   height: 140px;
   display: flex;
   flex-direction: column;
@@ -410,12 +414,12 @@ const submitCreate = async () => {
 .icon-wrapper {
   width: 40px;
   height: 40px;
-  background: #f0f9eb;
+  background: rgba(103, 194, 58, 0.15);
   border-radius: 8px;
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #67c23a;
+  color: #67c23a !important;
   font-size: 20px;
   flex-shrink: 0;
 }
@@ -428,7 +432,7 @@ const submitCreate = async () => {
 .header-info h3 {
   margin: 0 0 5px;
   font-size: 16px;
-  color: #303133;
+  color: var(--el-text-color-primary);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -470,9 +474,10 @@ const submitCreate = async () => {
 }
 
 .category-tag {
-  background: #f4f4f5;
+  background: rgba(255, 255, 255, 0.1);
   padding: 2px 6px;
   border-radius: 4px;
+  color: rgba(255, 255, 255, 0.8) !important;
 }
 
 .click-count {
@@ -482,15 +487,17 @@ const submitCreate = async () => {
 }
 
 .panel-card {
-  background: white;
+  background: var(--card-bg);
+  backdrop-filter: blur(10px);
   border-radius: 8px;
   padding: 20px;
   margin-bottom: 20px;
-  box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.05);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+  border: 1px solid var(--border-color);
 }
 
 .panel-header {
-  border-bottom: 1px solid #ebeef5;
+  border-bottom: 1px solid var(--border-color);
   padding-bottom: 10px;
   margin-bottom: 15px;
 }
@@ -508,7 +515,7 @@ const submitCreate = async () => {
   align-items: center;
   padding: 10px 0;
   cursor: pointer;
-  border-bottom: 1px solid #f5f7fa;
+  border-bottom: 1px solid var(--border-color);
 }
 
 .hot-item:last-child {
@@ -522,8 +529,8 @@ const submitCreate = async () => {
 .rank {
   width: 20px;
   height: 20px;
-  background: #f0f2f5;
-  color: #909399;
+  background: rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.8) !important;
   border-radius: 4px;
   display: flex;
   align-items: center;
@@ -554,7 +561,7 @@ const submitCreate = async () => {
 
 .tips-content {
   font-size: 13px;
-  color: #606266;
+  color: rgba(255, 255, 255, 0.7);
   line-height: 1.6;
 }
 

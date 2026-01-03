@@ -40,7 +40,7 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { ArrowLeft, Link, Delete } from '@element-plus/icons-vue'
+import { Link, Delete } from '@element-plus/icons-vue'
 import axios from 'axios'
 import { ElMessage, ElMessageBox } from 'element-plus'
 
@@ -100,14 +100,17 @@ onMounted(() => {
   padding: 20px;
   max-width: 1000px;
   margin: 0 auto;
+  color: #fff;
 }
 
 .page-header {
   margin-bottom: 20px;
-  background: white;
+  background: var(--card-bg);
+  backdrop-filter: blur(10px);
   padding: 15px 20px;
   border-radius: 8px;
-  box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.05);
+  border: 1px solid var(--border-color);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
 }
 
 .header-left {
@@ -119,14 +122,16 @@ onMounted(() => {
 .header-left h2 {
   margin: 0;
   font-size: 20px;
-  color: #303133;
+  color: #fff;
 }
 
 .collection-list {
-  background: white;
+  background: var(--card-bg);
+  backdrop-filter: blur(10px);
   border-radius: 8px;
   padding: 20px;
-  box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.05);
+  border: 1px solid var(--border-color);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
 }
 
 .link-name-cell {
@@ -137,6 +142,28 @@ onMounted(() => {
 
 .link-name-cell .name {
   font-weight: 500;
-  color: #303133;
+  color: #fff;
 }
+
+:deep(.el-table) {
+  background-color: transparent !important;
+  color: #fff !important;
+}
+
+:deep(.el-table__row) {
+  background-color: transparent !important;
+}
+
+:deep(.el-table th.el-table__cell) {
+  background-color: rgba(255, 255, 255, 0.05) !important;
+  color: #00f2fe !important;
+}
+
+:deep(.el-button--danger.is-link) {
+  color: #f56c6c !important;
+}
+:deep(.el-button--primary.is-link) {
+  color: #409eff !important;
+}
+
 </style>

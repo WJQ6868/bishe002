@@ -35,7 +35,7 @@ const statusParams = () =>
 const loadRecords = async () => {
   loading.value = true
   try {
-    const res = await axios.get<AdjustRecord[]>('/api/work/adjust/list', {
+    const res = await axios.get<AdjustRecord[]>('/work/adjust/list', {
       params: statusParams()
     })
     records.value = res.data
@@ -53,7 +53,7 @@ const handleApprove = (record: AdjustRecord, result: 'approved' | 'rejected') =>
     type: result === 'approved' ? 'success' : 'warning'
   }).then(async () => {
     try {
-      await axios.post('/api/work/adjust/approve', null, {
+      await axios.post('/work/adjust/approve', null, {
         params: { adjust_id: record.id, result }
       })
       ElMessage.success('审批成功')
@@ -137,7 +137,9 @@ const getStatusTag = (status: string) => {
 <style scoped>
 .adjust-container {
   padding: 20px;
-  background: #fff;
+  background: var(--card-bg);
+  backdrop-filter: blur(10px);
+  border: 1px solid var(--border-color);
   border-radius: 8px;
   min-height: calc(100vh - 120px);
 }
@@ -148,12 +150,12 @@ const getStatusTag = (status: string) => {
   align-items: center;
   margin-bottom: 20px;
   padding-bottom: 20px;
-  border-bottom: 1px solid #EBEEF5;
+  border-bottom: 1px solid var(--border-color);
 }
 
 .header-bar h3 {
   margin: 0;
-  color: #303133;
+  color: var(--el-text-color-primary);
 }
 
 .done-text {
