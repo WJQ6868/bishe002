@@ -710,7 +710,7 @@ async def stream_qa(request: QARequest, db: AsyncSession = Depends(get_db)):
     if not request.question.strip():
         raise HTTPException(status_code=400, detail="Question cannot be empty")
 
-    # 先按 workflow 指定的课程助手工作流；否则退回默认课程助手
+    # 先按 workflow 指定工作流；否则退回默认课程助手
     app_code = (request.workflow or "").strip()
     if app_code.startswith("app:"):
         app_code = app_code[4:]
@@ -718,20 +718,24 @@ async def stream_qa(request: QARequest, db: AsyncSession = Depends(get_db)):
     if app_code:
         stmt = select(AiWorkflowApp).where(
             AiWorkflowApp.code == app_code,
-            AiWorkflowApp.type == "course_assistant",
             AiWorkflowApp.status == "enabled",
         )
         if request.course_id is not None:
             stmt = stmt.where((AiWorkflowApp.course_id == request.course_id) | (AiWorkflowApp.course_id == None))
         app = (await db.execute(stmt)).scalars().first()
     if not app:
+        if app_code:
+            gen = _sse_single_message(f"未找到或未启用工作流：{app_code}")
+            return StreamingResponse(gen, media_type="text/event-stream")
         app = await _get_or_create_app(db, code="course_assistant", name="AI课程助手", app_type="course_assistant")
 
     app_settings = _load_json_settings(app.settings_json)
+    app_type = (app.type or "course_assistant").strip() or "course_assistant"
+    feature_label = "AI 课程助手" if app_type == "course_assistant" else "智能教案"
 
     # 优先使用学生课程自选模型
     selected_model: AiModelApi | None = None
-    if request.course_id is not None:
+    if app_type == "course_assistant" and request.course_id is not None:
         uid = _safe_int(request.user_id)
         if uid is not None:
             sel = (
@@ -749,11 +753,14 @@ async def stream_qa(request: QARequest, db: AsyncSession = Depends(get_db)):
                     )
                 ).scalars().first()
 
-    if not _model_api_ready(selected_model):
-        selected_model = await _resolve_model_api(db, explicit_key=request.model, app=app)
+    if app_type == "course_assistant":
+        if not _model_api_ready(selected_model):
+            selected_model = await _resolve_model_api(db, explicit_key=request.model, app=app)
+    else:
+        selected_model = await _resolve_model_api(db, explicit_key=None, app=app)
 
     if not _model_api_ready(selected_model):
-        gen = _sse_single_message("AI 课程助手未配置可用模型或缺少 API Key，请在后台启用并填写密钥。")
+        gen = _sse_single_message(f"{feature_label}未配置可用模型或缺少 API Key，请在后台启用并填写密钥。")
         return StreamingResponse(gen, media_type="text/event-stream")
 
     kb_ids: List[int] = []
@@ -766,7 +773,11 @@ async def stream_qa(request: QARequest, db: AsyncSession = Depends(get_db)):
         request.question,
         "以下为可能有帮助的知识库片段（根据相关度排序）：",
     )
-    system_prompt = app_settings.get("system_prompt_template") or "你是课程智能助手，请基于知识片段回答，并引用编号。"
+    if app_type == "lesson_plan":
+        default_prompt = "你是高校教师教案助手，请基于知识片段生成结构化教案，并尽量引用编号。"
+    else:
+        default_prompt = "你是课程智能助手，请基于知识片段回答，并引用编号。"
+    system_prompt = app_settings.get("system_prompt_template") or default_prompt
     final_question = _compose_prompt(request.question, system_prompt, kb_context)
 
     if selected_model:
@@ -784,11 +795,11 @@ async def stream_qa(request: QARequest, db: AsyncSession = Depends(get_db)):
 
     try:
         return StreamingResponse(
-            _with_completion(gen, selected_model, final_question, "AI 课程助手未返回内容，请检查模型连通性或稍后重试。"),
+            _with_completion(gen, selected_model, final_question, f"{feature_label}未返回内容，请检查模型连通性或稍后重试。"),
             media_type="text/event-stream",
         )
     except Exception as e:
-        err = _sse_single_message(f"AI 课程助手调用失败: {e}")
+        err = _sse_single_message(f"{feature_label}调用失败: {e}")
         return StreamingResponse(err, media_type="text/event-stream")
 
 @router.post("/customer-service/stream")
