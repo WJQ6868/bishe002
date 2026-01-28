@@ -756,17 +756,21 @@ async def stream_qa(request: QARequest, db: AsyncSession = Depends(get_db)):
         gen = _sse_single_message("AI 课程助手未配置可用模型或缺少 API Key，请在后台启用并填写密钥。")
         return StreamingResponse(gen, media_type="text/event-stream")
 
+    # 优先课程专属KB，再基础KB
     kb_ids: List[int] = []
+    kb_ids.extend(await _resolve_course_kb_ids(db, request.course_id))
     if app.knowledge_base_id:
         kb_ids.append(int(app.knowledge_base_id))
-    kb_ids.extend(await _resolve_course_kb_ids(db, request.course_id))
     kb_context = await _build_kb_prompt(
         db,
         kb_ids,
         request.question,
         "以下为可能有帮助的知识库片段（根据相关度排序）：",
     )
-    system_prompt = app_settings.get("system_prompt_template") or "你是课程智能助手，请基于知识片段回答，并引用编号。"
+    system_prompt = app_settings.get("system_prompt_template") or (
+        "你是课程智能助手，优先使用教师上传的课程专属知识库，其次再使用管理员配置的基础知识库。"
+        "回答时依据知识片段并在句尾标注【编号】，无法覆盖时说明并给出建议。"
+    )
     final_question = _compose_prompt(request.question, system_prompt, kb_context)
 
     if selected_model:

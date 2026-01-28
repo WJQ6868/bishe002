@@ -3,6 +3,8 @@
   --primary-color: #00f2fe;
   --bg-color: #050505;
   --card-bg: rgba(20, 20, 20, 0.6);
+  --light-panel-bg: rgba(255, 255, 255, 0.08);
+  --light-panel-hover: rgba(255, 255, 255, 0.12);
   --border-color: rgba(255, 255, 255, 0.1);
   --text-primary: #ffffff;
   --text-secondary: rgba(255, 255, 255, 0.7);
@@ -47,6 +49,48 @@ body {
 .el-select__wrapper {
   background-color: rgba(255, 255, 255, 0.05) !important;
   box-shadow: 0 0 0 1px var(--border-color) inset !important;
+}
+
+.el-input-group__append,
+.el-input-group__prepend {
+  background-color: rgba(255, 255, 255, 0.06) !important;
+  border-color: var(--border-color) !important;
+  color: #fff !important;
+}
+
+.el-input-group__append .el-button,
+.el-input-group__prepend .el-button {
+  background-color: transparent !important;
+  border: none !important;
+  color: #fff !important;
+}
+
+.el-input-group__append .el-button:hover,
+.el-input-group__prepend .el-button:hover {
+  background-color: rgba(255, 255, 255, 0.08) !important;
+}
+
+.el-input-number {
+  background-color: transparent !important;
+}
+
+.el-input-number__increase,
+.el-input-number__decrease {
+  background-color: rgba(255, 255, 255, 0.06) !important;
+  border-color: var(--border-color) !important;
+  color: rgba(255, 255, 255, 0.9) !important;
+}
+
+.el-input-number__increase:hover,
+.el-input-number__decrease:hover {
+  background-color: rgba(255, 255, 255, 0.12) !important;
+  color: #fff !important;
+}
+
+.el-input-number__increase.is-disabled,
+.el-input-number__decrease.is-disabled {
+  background-color: rgba(255, 255, 255, 0.03) !important;
+  color: rgba(255, 255, 255, 0.35) !important;
 }
 
 .el-input__inner,
@@ -289,7 +333,7 @@ div[style*="z-index: 9999999"] {
   color: #00f2fe !important;
 }
 
-/* Force dark text on specific light-background classes */
+/* Normalize light/white backgrounds to translucent panels */
 .bg-white,
 .bg-light,
 [style*="background: white"],
@@ -298,17 +342,20 @@ div[style*="z-index: 9999999"] {
 [style*="background-color: #fff"],
 [style*="background: rgb(255, 255, 255)"],
 [style*="background-color: rgb(255, 255, 255)"] {
-  color: #303133 !important;
+  background: var(--light-panel-bg) !important;
+  background-color: var(--light-panel-bg) !important;
+  border-color: var(--border-color) !important;
+  color: #fff !important;
 }
 
-/* Ensure children of white backgrounds also have dark text */
+/* Ensure children of normalized panels keep light text */
 .bg-white *,
 .bg-light *,
 [style*="background: white"] *,
 [style*="background: #fff"] *,
 [style*="background-color: white"] *,
 [style*="background-color: #fff"] * {
-  color: #303133 !important;
+  color: #fff !important;
 }
 
 /* Table headers often have a light tint */
@@ -361,15 +408,14 @@ div[style*="z-index: 9999999"] {
   color: #fff !important;
 }
 
-/* Override the overly aggressive global white text rule for light backgrounds */
-/* Force dark text ONLY on explicitly light-background containers that are NOT glassmorphism */
+/* Keep text readable on normalized light panels */
 .bg-white p,
 .bg-white span,
 .bg-white label,
 .bg-light p,
 .bg-light span,
 .bg-light label {
-  color: #303133 !important;
+  color: #fff !important;
 }
 
 /* 10. Global Gray Text Override - Change ALL gray text to white */
@@ -435,6 +481,16 @@ small:not(.bg-white *):not(.bg-light *),
 .el-tabs--border-card > .el-tabs__content {
   background: var(--card-bg) !important;
   border-color: var(--border-color) !important;
+}
+
+.el-tabs--border-card .el-tabs__item {
+  background: transparent !important;
+  border-color: var(--border-color) !important;
+}
+
+.el-tabs--border-card .el-tabs__item.is-active {
+  background: var(--light-panel-bg) !important;
+  border-bottom-color: transparent !important;
 }
 
 .el-tabs__header {

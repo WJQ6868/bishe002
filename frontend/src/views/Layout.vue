@@ -53,6 +53,7 @@ const menus = computed(() => {
     { path: '/student/course-select', title: '选课中心', icon: 'Mouse', roles: ['student'] },
     { path: '/student/course-management', title: '选课管理', icon: 'List', roles: ['student'] },
     { path: '/student/grade-management', title: '成绩管理', icon: 'Medal', roles: ['student'] },
+    { path: '/student/ai-course-assistant', title: 'AI课程助手', icon: 'Search', roles: ['student'] },
     { path: '/student/profile-center', title: '个人中心', icon: 'User', roles: ['student'] },
     { path: '/student/homework', title: '我的作业', icon: 'Edit', roles: ['student'] },
 

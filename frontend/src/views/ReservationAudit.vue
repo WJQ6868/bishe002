@@ -67,6 +67,48 @@ const profileMap = computed<Record<number, any>>(() => {
   return map
 })
 
+const pad2 = (value: number) => String(value).padStart(2, '0')
+
+const toYmd = (date: Date) =>
+  `${date.getFullYear()}-${pad2(date.getMonth() + 1)}-${pad2(date.getDate())}`
+
+const normalizeDate = (raw?: string | null) => {
+  if (!raw) return ''
+  const str = String(raw).trim()
+  const match = str.match(/\d{4}-\d{2}-\d{2}/)
+  if (match) return match[0]
+  const parsed = new Date(str)
+  if (!Number.isNaN(parsed.getTime())) return toYmd(parsed)
+  return ''
+}
+
+const extractDateFromForm = (formData: Record<string, any>) => {
+  const keys = Object.keys(formData || {})
+  for (const key of keys) {
+    if (key.includes('日期') || key.includes('时间') || key.includes('预约')) {
+      const normalized = normalizeDate(formData[key])
+      if (normalized) return normalized
+    }
+  }
+  for (const value of Object.values(formData || {})) {
+    const normalized = normalizeDate(value)
+    if (normalized) return normalized
+  }
+  return ''
+}
+
+const isSameDay = (left?: string | null, right?: string | null) => {
+  const l = normalizeDate(left)
+  const r = normalizeDate(right)
+  return Boolean(l && r && l === r)
+}
+
+const isSameMonth = (value?: string | null, monthKey?: string) => {
+  const date = normalizeDate(value)
+  if (!date || !monthKey) return false
+  return date.startsWith(monthKey)
+}
+
 const parseFormData = (raw: any) => {
   if (typeof raw === 'object' && raw !== null) return raw
   if (!raw) return {}
@@ -92,7 +134,9 @@ const reservations = computed<ReservationAudit[]>(() => {
     const auditorProfile = apply.approver_id ? profileMap.value[apply.approver_id] : null
     const auditorUser = apply.approver_id ? sysUserMap.value[apply.approver_id] : null
 
-    const derivedDate = formData.date || formData.schedule || (apply.submit_time?.split(' ')?.[0] ?? '')
+    const submitDate = normalizeDate(apply.submit_time)
+    const formDate = extractDateFromForm(formData) || normalizeDate(formData.date || formData.schedule)
+    const derivedDate = formDate || submitDate
     const timeSlots = Array.isArray(formData.timeSlots)
       ? formData.timeSlots
       : formData.time_slot
@@ -160,19 +204,23 @@ const tableData = computed(() => {
 
 // 统计数据
 const statistics = computed(() => {
+  const today = toYmd(new Date())
+  const monthKey = today.slice(0, 7)
   const pending = reservations.value.filter(i => i.status === 'pending').length
-  const approvedToday = reservations.value.filter(i => i.status === 'approved').length 
-  const rejectedToday = reservations.value.filter(i => i.status === 'rejected').length
-  const totalMonth = reservations.value.length
+  const approvedToday = reservations.value.filter(i => i.status === 'approved' && isSameDay(i.auditTime || i.submitTime, today)).length
+  const rejectedToday = reservations.value.filter(i => i.status === 'rejected' && isSameDay(i.auditTime || i.submitTime, today)).length
+  const totalMonth = reservations.value.filter(i => isSameMonth(i.date || i.submitTime, monthKey)).length
 
   return { pending, approvedToday, rejectedToday, totalMonth }
 })
 
 // 利用率TOP5
 const topUtilization = computed<ResourceUtilization[]>(() => {
+  const monthKey = toYmd(new Date()).slice(0, 7)
+  const monthlyReservations = reservations.value.filter(i => isSameMonth(i.date || i.submitTime, monthKey))
   const map = new Map<string, { count: number, type: ResourceType }>()
   
-  reservations.value.forEach(res => {
+  monthlyReservations.forEach(res => {
     if (!map.has(res.resourceName)) {
       map.set(res.resourceName, { count: 0, type: res.type })
     }
@@ -589,12 +637,12 @@ const filterByStatus = (status: string) => {
 .rank {
   width: 20px;
   height: 20px;
-  background: #f0f2f5;
+  background: rgba(255, 255, 255, 0.08);
   border-radius: 50%;
   text-align: center;
   line-height: 20px;
   font-size: 12px;
-  color: #909399;
+  color: rgba(255, 255, 255, 0.7);
   margin-right: 5px;
 }
 .rank-1 { background: #F56C6C; color: #fff; }
@@ -610,13 +658,13 @@ const filterByStatus = (status: string) => {
 }
 
 .audit-detail {
-  background: #f5f7fa;
+  background: rgba(255, 255, 255, 0.06);
   padding: 15px;
   border-radius: 4px;
   margin-bottom: 20px;
 }
 .audit-detail p {
   margin: 5px 0;
-  color: #606266;
+  color: rgba(255, 255, 255, 0.8);
 }
 </style>

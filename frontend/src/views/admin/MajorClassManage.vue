@@ -103,10 +103,14 @@ const loadMajors = async () => {
     if (!selectedCollegeId.value) {
       majors.value = []
       selectedMajorId.value = null
+      classes.value = []
+      selectedClassId.value = null
+      students.value = []
       return
     }
     majors.value = await fetchMajors(selectedCollegeId.value)
     if (!selectedMajorId.value && majors.value.length) selectedMajorId.value = majors.value[0].id
+    await loadClasses()
   } catch (e: any) {
     ElMessage.error(e?.response?.data?.detail || '获取专业失败')
   } finally {

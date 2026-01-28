@@ -4,10 +4,11 @@ import json
 import os
 import re
 import uuid
+import time
 from datetime import datetime
 from typing import List, Optional
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, Body
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -23,6 +24,7 @@ from ..models.ai_config import (
     AiWorkflowApp,
     StudentCourseAiFavorite,
     StudentCourseAiSelection,
+    TeacherKnowledgeBaseDocument,
 )
 from ..models.course import Course
 from ..models.user import User
@@ -38,10 +40,7 @@ from ..schemas.ai_portal import (
     TeacherKbDocumentOut,
     TeacherKbUpdateRequest,
 )
-from ..schemas.admin_ai import AiWorkflowAppOut
-from ..schemas.admin_ai import AiWorkflowAppOut
-
-from ..schemas.admin_ai import AiCustomerServiceSettingsOut
+from ..schemas.admin_ai import AiWorkflowAppOut, AiCustomerServiceSettingsOut
 from ..services.ai_workflow import delete_document_chunks, extract_text_from_file, rebuild_document_chunks
 
 router = APIRouter(prefix="/ai", tags=["AI Portal"])
@@ -267,6 +266,161 @@ async def list_course_assistant_apps(
             )
         )
     return items
+
+
+# ---------- Teacher-owned course assistant workflows ----------
+
+@router.get("/teacher/course-assistant/apps", response_model=List[AiWorkflowAppOut])
+async def list_teacher_course_assistant_apps(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    if current_user.role != "teacher":
+        raise HTTPException(status_code=403, detail="仅教师可操作")
+    res = await db.execute(
+        select(AiWorkflowApp)
+        .where(
+            AiWorkflowApp.type == "course_assistant",
+            AiWorkflowApp.owner_user_id == current_user.id,
+        )
+        .order_by(AiWorkflowApp.updated_at.desc().nullslast(), AiWorkflowApp.id.desc())
+    )
+    apps = res.scalars().all()
+    return [
+        AiWorkflowAppOut(
+            code=a.code,
+            type=a.type,
+            name=a.name,
+            status=a.status,
+            knowledge_base_id=a.knowledge_base_id,
+            model_api_id=a.model_api_id,
+            owner_user_id=a.owner_user_id,
+            course_id=a.course_id,
+            settings=_load_json_settings(a.settings_json),
+            updated_at=a.updated_at,
+        )
+        for a in apps
+    ]
+
+
+@router.post("/teacher/course-assistant/apps", response_model=AiWorkflowAppOut)
+async def create_teacher_course_assistant_app(
+    name: str = Body(..., embed=True),
+    base_code: str = Body(..., embed=True),
+    course_id: Optional[int] = Body(None, embed=True),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    if current_user.role != "teacher":
+        raise HTTPException(status_code=403, detail="仅教师可操作")
+
+    base_app = (
+        await db.execute(
+            select(AiWorkflowApp).where(
+                AiWorkflowApp.code == base_code,
+                AiWorkflowApp.type == "course_assistant",
+                AiWorkflowApp.status == "enabled",
+            )
+        )
+    ).scalars().first()
+    if not base_app:
+        raise HTTPException(status_code=404, detail="基础工作流不存在或未启用")
+
+    code = f"tca-{current_user.id}-{int(time.time())}"
+    new_app = AiWorkflowApp(
+        code=code,
+        type="course_assistant",
+        name=name.strip() or base_app.name,
+        status="enabled",
+        knowledge_base_id=base_app.knowledge_base_id,
+        model_api_id=base_app.model_api_id,
+        owner_user_id=current_user.id,
+        course_id=course_id,
+        settings_json=base_app.settings_json,
+    )
+    db.add(new_app)
+    await db.commit()
+    await db.refresh(new_app)
+    return AiWorkflowAppOut(
+        code=new_app.code,
+        type=new_app.type,
+        name=new_app.name,
+        status=new_app.status,
+        knowledge_base_id=new_app.knowledge_base_id,
+        model_api_id=new_app.model_api_id,
+        owner_user_id=new_app.owner_user_id,
+        course_id=new_app.course_id,
+        settings=_load_json_settings(new_app.settings_json),
+        updated_at=new_app.updated_at,
+    )
+
+
+@router.put("/teacher/course-assistant/apps/{code}", response_model=AiWorkflowAppOut)
+async def update_teacher_course_assistant_app(
+    code: str,
+    name: Optional[str] = Body(None, embed=True),
+    course_id: Optional[int] = Body(None, embed=True),
+    status: Optional[str] = Body(None, embed=True),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    if current_user.role != "teacher":
+        raise HTTPException(status_code=403, detail="仅教师可操作")
+    app = (
+        await db.execute(
+            select(AiWorkflowApp).where(
+                AiWorkflowApp.code == code,
+                AiWorkflowApp.owner_user_id == current_user.id,
+                AiWorkflowApp.type == "course_assistant",
+            )
+        )
+    ).scalars().first()
+    if not app:
+        raise HTTPException(status_code=404, detail="工作流不存在")
+    if name is not None:
+        app.name = name.strip() or app.name
+    if course_id is not None:
+        app.course_id = course_id
+    if status in {"enabled", "disabled"}:
+        app.status = status
+    await db.commit()
+    await db.refresh(app)
+    return AiWorkflowAppOut(
+        code=app.code,
+        type=app.type,
+        name=app.name,
+        status=app.status,
+        knowledge_base_id=app.knowledge_base_id,
+        model_api_id=app.model_api_id,
+        owner_user_id=app.owner_user_id,
+        course_id=app.course_id,
+        settings=_load_json_settings(app.settings_json),
+        updated_at=app.updated_at,
+    )
+
+
+@router.delete("/teacher/course-assistant/apps/{code}")
+async def delete_teacher_course_assistant_app(
+    code: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    if current_user.role != "teacher":
+        raise HTTPException(status_code=403, detail="仅教师可操作")
+    app = (
+        await db.execute(
+            select(AiWorkflowApp).where(
+                AiWorkflowApp.code == code,
+                AiWorkflowApp.owner_user_id == current_user.id,
+                AiWorkflowApp.type == "course_assistant",
+            )
+        )
+    ).scalars().first()
+    if not app:
+        return {"ok": True}
+    await db.delete(app)
+    await db.commit()
+    return {"ok": True}
 
 _TEACHER_UPLOAD_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "static", "uploads", "kb_teacher")
 os.makedirs(_TEACHER_UPLOAD_DIR, exist_ok=True)
@@ -594,7 +748,7 @@ async def create_lesson_plan_task(
         raise HTTPException(status_code=403, detail="Only teachers can access")
     title = (payload.title or "").strip()
     if not title:
-        raise HTTPException(status_code=400, detail="??????")
+        raise HTTPException(status_code=400, detail="标题不能为空")
 
     course_id = payload.course_id
     if course_id is not None:
@@ -604,7 +758,7 @@ async def create_lesson_plan_task(
         if str(c.teacher_id) != str(current_user.username):
             raise HTTPException(status_code=403, detail="Not your course")
 
-    app = await _get_or_create_app(db, code="lesson_plan", name="????", app_type="lesson_plan")
+    app = await _get_or_create_app(db, code="lesson_plan", name="智能教案", app_type="lesson_plan")
     task = AiLessonPlanTask(
         teacher_user_id=current_user.id,
         course_id=course_id,

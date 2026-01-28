@@ -471,7 +471,7 @@ defineExpose({
   display: flex;
   align-items: center;
   padding: 12px 16px;
-  background: #F5F7FA;
+  background: rgba(255, 255, 255, 0.06);
   border-radius: 8px;
   transition: all 0.2s;
 }
@@ -479,7 +479,7 @@ defineExpose({
 .user-item:hover,
 .request-item:hover,
 .friend-item:hover {
-  background: #ECF5FF;
+  background: rgba(255, 255, 255, 0.1);
 }
 
 .user-avatar,
@@ -543,7 +543,7 @@ defineExpose({
 .friend-name {
   font-size: 15px;
   font-weight: 500;
-  color: #303133;
+  color: #fff;
   margin-bottom: 4px;
 }
 
@@ -551,7 +551,7 @@ defineExpose({
 .request-username,
 .friend-meta {
   font-size: 13px;
-  color: #909399;
+  color: rgba(255, 255, 255, 0.7);
 }
 
 .user-dept {
@@ -560,17 +560,17 @@ defineExpose({
 
 .request-message {
   font-size: 13px;
-  color: #606266;
+  color: rgba(255, 255, 255, 0.85);
   margin-top: 4px;
   padding: 6px 10px;
-  background: #fff;
+  background: rgba(255, 255, 255, 0.08);
   border-radius: 4px;
 }
 
 .request-time,
 .friend-status {
   font-size: 12px;
-  color: #C0C4CC;
+  color: rgba(255, 255, 255, 0.5);
   margin-top: 4px;
 }
 

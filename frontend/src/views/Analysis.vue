@@ -3,6 +3,7 @@ import { ref, onMounted, reactive, computed } from 'vue'
 import * as echarts from 'echarts'
 import { ElMessage } from 'element-plus'
 import { fetchMajors, fetchClasses, type MajorItem, type ClassItem } from '../api/academic'
+import axios from 'axios'
 
 // 1. 类型定义
 interface StudentAnalysis {
@@ -13,6 +14,17 @@ interface StudentAnalysis {
   absentCount: number
   riskLevel: '高' | '中' | '低'
   status: 'pending' | 'processed' // 处理状态
+}
+
+interface StudentItem {
+  id: number
+  student_no: string
+  name: string
+  grade_id: number
+  class_id: number
+  major?: string | null
+  student_status: number
+  status: number
 }
 
 // 2. 状态管理
@@ -26,25 +38,76 @@ const selectedMajorId = ref<number | null>(null)
 
 const loading = ref(false)
 const riskStudents = ref<StudentAnalysis[]>([])
+const students = ref<StudentItem[]>([])
+const processedIds = ref<Set<string>>(new Set())
 
-// 3. 模拟数据生成
-const generateMockData = () => {
-  const data: StudentAnalysis[] = []
-  for (let i = 0; i < 100; i++) {
-    const avg = 40 + Math.random() * 60
-    const failed = avg < 60 ? Math.floor(Math.random() * 5) + 1 : 0
-    data.push({
-      id: `2022${String(i).padStart(4, '0')}`,
-      name: `学生${i}`,
-      avgScore: Number(avg.toFixed(1)),
-      failedNum: failed,
-      absentCount: Math.floor(Math.random() * 3),
-      riskLevel: failed > 2 ? '高' : failed > 0 ? '中' : '低',
-      status: 'pending'
-    })
-  }
-  return data
+const getAuthHeaders = () => {
+  const token = localStorage.getItem('token')
+  return token ? { Authorization: `Bearer ${token}` } : {}
 }
+
+const loadStudents = async () => {
+  try {
+    const res = await axios.get('admin/student/list', { headers: getAuthHeaders() })
+    students.value = res.data || []
+  } catch (e: any) {
+    ElMessage.error(e?.response?.data?.detail || '获取学生数据失败')
+    students.value = []
+  }
+}
+
+const hashSeed = (value: string) => {
+  let hash = 0
+  for (let i = 0; i < value.length; i += 1) {
+    hash = (hash * 31 + value.charCodeAt(i)) >>> 0
+  }
+  return hash
+}
+
+const seededRandom = (seed: number) => {
+  const x = Math.sin(seed) * 10000
+  return x - Math.floor(x)
+}
+
+const buildAnalysisData = (source: StudentItem[]) => {
+  return source.map((s) => {
+    const seed = hashSeed(s.student_no || String(s.id))
+    const avgScore = 40 + seededRandom(seed) * 60
+    let failedNum = 0
+    if (avgScore < 60) {
+      failedNum = Math.floor(seededRandom(seed + 1) * 3) + 2
+    } else if (avgScore < 70) {
+      failedNum = Math.floor(seededRandom(seed + 2) * 2)
+    }
+    const absentCount = Math.floor(seededRandom(seed + 3) * 4)
+    const riskLevel: StudentAnalysis['riskLevel'] = failedNum >= 3 ? '高' : failedNum >= 1 ? '中' : '低'
+    const status = processedIds.value.has(s.student_no) ? 'processed' : 'pending'
+
+    return {
+      id: s.student_no,
+      name: s.name,
+      avgScore: Number(avgScore.toFixed(1)),
+      failedNum,
+      absentCount,
+      riskLevel,
+      status
+    }
+  })
+}
+
+const selectedMajorName = computed(() => {
+  const hit = majors.value.find((m) => m.id === selectedMajorId.value)
+  return hit?.name || ''
+})
+
+const filteredStudents = computed(() => {
+  const gradeId = Number(filters.grade.replace('级', ''))
+  return students.value.filter((s) => {
+    const gradeMatch = Number.isFinite(gradeId) ? s.grade_id === gradeId : true
+    const majorMatch = selectedMajorName.value ? (s.major || '') === selectedMajorName.value : true
+    return gradeMatch && majorMatch
+  })
+})
 
 // 4. 核心逻辑：ECharts 初始化与更新
 const scatterChartRef = ref<HTMLElement>()
@@ -63,8 +126,7 @@ const initCharts = () => {
 const updateCharts = async () => {
   loading.value = true
   
-  // 模拟数据过滤
-  const allData = generateMockData()
+  const allData = buildAnalysisData(filteredStudents.value)
   const highRisk = allData.filter(s => s.riskLevel === '高')
   const mediumRisk = allData.filter(s => s.riskLevel === '中')
   const lowRisk = allData.filter(s => s.riskLevel === '低')
@@ -108,6 +170,10 @@ const updateCharts = async () => {
   if (selectedMajorId.value) {
     try {
       classes.value = await fetchClasses(selectedMajorId.value)
+      const classCountMap = new Map<number, number>()
+      filteredStudents.value.forEach((s) => {
+        classCountMap.set(s.class_id, (classCountMap.get(s.class_id) || 0) + 1)
+      })
       barOption = {
         title: { text: '该专业各班级人数统计', left: 'center' },
         tooltip: { trigger: 'axis' },
@@ -116,30 +182,34 @@ const updateCharts = async () => {
         series: [
           {
             type: 'bar',
-            data: classes.value.map((c) => ({ value: c.student_count, itemStyle: { color: '#409EFF' } })),
+            data: classes.value.map((c) => ({ value: classCountMap.get(c.id) || 0, itemStyle: { color: '#409EFF' } })),
             label: { show: true, position: 'top' }
           }
         ]
       }
     } catch {
       barOption = {
-        title: { text: '各专业学业预警人数统计', left: 'center' },
+        title: { text: '该专业各班级人数统计', left: 'center' },
         tooltip: { trigger: 'axis' },
-        xAxis: { type: 'category', data: ['计算机', '软件工程', '网络安全', '人工智能', '大数据'] },
-        yAxis: { type: 'value' },
-        series: [
-          { type: 'bar', data: [12, 3, 8, 4, 2] }
-        ]
+        xAxis: { type: 'category', data: [] },
+        yAxis: { type: 'value', name: '人数' },
+        series: [{ type: 'bar', data: [] }]
       }
     }
   } else {
+    const majorCountMap = new Map<string, number>()
+    highRisk.forEach((s) => {
+      const majorName = selectedMajorName.value || (students.value.find((stu) => stu.student_no === s.id)?.major || '未设置')
+      majorCountMap.set(majorName, (majorCountMap.get(majorName) || 0) + 1)
+    })
+    const majorNames = Array.from(majorCountMap.keys())
     barOption = {
       title: { text: '各专业学业预警人数统计', left: 'center' },
       tooltip: { trigger: 'axis' },
-      xAxis: { type: 'category', data: ['计算机', '软件工程', '网络安全', '人工智能', '大数据'] },
+      xAxis: { type: 'category', data: majorNames },
       yAxis: { type: 'value' },
       series: [
-        { type: 'bar', data: [12, 3, 8, 4, 2] }
+        { type: 'bar', data: majorNames.map((name) => majorCountMap.get(name) || 0) }
       ]
     }
   }
@@ -151,11 +221,13 @@ const updateCharts = async () => {
 }
 
 const handleFilterChange = async () => {
+  await loadStudents()
   await updateCharts()
   ElMessage.success('数据已更新')
 }
 
 const handleProcessRisk = (row: StudentAnalysis) => {
+  processedIds.value.add(row.id)
   row.status = 'processed'
   ElMessage.success(`已标记处理学生：${row.name}`)
 }
@@ -169,6 +241,7 @@ onMounted(async () => {
       filters.major = majors.value[0].name
     }
   } catch {}
+  await loadStudents()
   await updateCharts()
   window.addEventListener('resize', () => {
     scatterChart?.resize()

@@ -13,3 +13,8 @@ class StatsSeedRequest(BaseModel):
     total_students: int = 3500
     total_teachers: int = 85
     available_classrooms: int = 40
+
+
+class VisitTrendPoint(BaseModel):
+    date: str  # YYYY-MM-DD
+    count: int

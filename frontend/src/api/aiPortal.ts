@@ -115,6 +115,22 @@ export const aiPortalApi = {
     return res.data
   },
 
+  async listTeacherCourseAssistantApps() {
+    const res = await axios.get<AiWorkflowApp[]>('/ai/teacher/course-assistant/apps', { headers: authHeaders() })
+    return res.data
+  },
+  async createTeacherCourseAssistantApp(payload: { name: string; base_code: string; course_id?: number | null }) {
+    const res = await axios.post<AiWorkflowApp>('/ai/teacher/course-assistant/apps', payload, { headers: authHeaders() })
+    return res.data
+  },
+  async updateTeacherCourseAssistantApp(code: string, payload: { name?: string; course_id?: number | null; status?: string }) {
+    const res = await axios.put<AiWorkflowApp>(`/ai/teacher/course-assistant/apps/${code}`, payload, { headers: authHeaders() })
+    return res.data
+  },
+  async deleteTeacherCourseAssistantApp(code: string) {
+    await axios.delete(`/ai/teacher/course-assistant/apps/${code}`, { headers: authHeaders() })
+  },
+
   // teacher
   async listTeacherCourses() {
     const res = await axios.get<TeacherCourse[]>('/ai/teacher/courses', { headers: authHeaders() })

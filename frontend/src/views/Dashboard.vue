@@ -12,6 +12,9 @@ const stats = ref({
   available_classrooms: 0
 })
 
+const visitDates = ref<string[]>([])
+const visitCounts = ref<number[]>([])
+
 let timer: any = null
 let chartInstance: any = null
 let pieInstance: any = null
@@ -20,9 +23,20 @@ const fetchStats = async () => {
   try {
     const res = await axios.get('/dashboard/stats')
     stats.value = res.data
-    updateCharts()
   } catch (e) {
     ElMessage.error('统计数据获取失败')
+  }
+}
+
+const fetchVisits = async () => {
+  try {
+    const res = await axios.get('/dashboard/visits')
+    const list = res.data || []
+    visitDates.value = list.map((i: any) => i.date?.slice(5) || '')
+    visitCounts.value = list.map((i: any) => Number(i.count || 0))
+    updateCharts()
+  } catch (e) {
+    ElMessage.error('访问趋势获取失败')
   }
 }
 
@@ -38,10 +52,10 @@ const buildPieData = () => {
 const initCharts = () => {
   const chartDom = document.getElementById('activity-chart')
   const pieDom = document.getElementById('resource-chart')
-  
+
   if (chartDom) {
     chartInstance = echarts.init(chartDom)
-    const option = {
+    chartInstance.setOption({
       backgroundColor: 'transparent',
       tooltip: {
         trigger: 'axis',
@@ -50,16 +64,10 @@ const initCharts = () => {
         borderColor: 'rgba(255, 255, 255, 0.1)',
         textStyle: { color: '#fff' }
       },
-      grid: {
-        top: '15%',
-        left: '3%',
-        right: '4%',
-        bottom: '3%',
-        containLabel: true
-      },
+      grid: { top: '15%', left: '3%', right: '4%', bottom: '3%', containLabel: true },
       xAxis: {
         type: 'category',
-        data: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
+        data: [],
         axisLine: { lineStyle: { color: 'rgba(255,255,255,0.3)' } },
         axisLabel: { color: 'rgba(255,255,255,0.7)' }
       },
@@ -73,7 +81,7 @@ const initCharts = () => {
           name: '系统访问量',
           type: 'line',
           smooth: true,
-          data: [120, 132, 101, 134, 90, 230, 210],
+          data: [],
           itemStyle: { color: '#00f2fe' },
           areaStyle: {
             color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
@@ -83,15 +91,14 @@ const initCharts = () => {
           }
         }
       ]
-    }
-    chartInstance.setOption(option)
+    })
   }
 
   if (pieDom) {
     pieInstance = echarts.init(pieDom)
-    const pieOption = {
+    pieInstance.setOption({
       backgroundColor: 'transparent',
-      tooltip: { 
+      tooltip: {
         trigger: 'item',
         backgroundColor: 'rgba(20, 20, 20, 0.9)',
         borderColor: 'rgba(255, 255, 255, 0.1)',
@@ -108,62 +115,49 @@ const initCharts = () => {
           type: 'pie',
           radius: ['40%', '70%'],
           avoidLabelOverlap: false,
-          itemStyle: {
-            borderRadius: 10,
-            borderColor: '#050505',
-            borderWidth: 2
-          },
+          itemStyle: { borderRadius: 10, borderColor: '#050505', borderWidth: 2 },
           label: { show: false, position: 'center' },
-          emphasis: {
-            label: {
-              show: true,
-              fontSize: 20,
-              fontWeight: 'bold',
-              color: '#fff'
-            }
-          },
+          emphasis: { label: { show: true, fontSize: 20, fontWeight: 'bold', color: '#fff' } },
           data: buildPieData()
         }
       ]
-    }
-    pieInstance.setOption(pieOption)
+    })
   }
 }
 
 const updateCharts = () => {
-  // 饼图：资源分布（真实数据）
+  if (chartInstance) {
+    chartInstance.setOption({
+      xAxis: { data: visitDates.value.length ? visitDates.value : ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'] },
+      series: [{ name: '系统访问量', data: visitCounts.value.length ? visitCounts.value : [0, 0, 0, 0, 0, 0, 0] }]
+    })
+  }
+
   if (pieInstance) {
-    pieInstance.setOption(
-      {
-        series: [
-          {
-            name: '资源占比',
-            type: 'pie',
-            data: buildPieData()
-          }
-        ]
-      },
-      { notMerge: false }
-    )
+    pieInstance.setOption({
+      series: [{ name: '资源占比', type: 'pie', data: buildPieData() }]
+    })
   }
 }
 
 const handleRefresh = async () => {
-  await fetchStats()
+  await Promise.all([fetchStats(), fetchVisits()])
   ElMessage.success('已刷新')
 }
-
-onMounted(async () => {
-  initCharts()
-  await fetchStats()
-  timer = setInterval(fetchStats, 60000)
-  window.addEventListener('resize', resizeCharts)
-})
 
 const resizeCharts = () => {
   chartInstance?.resize()
   pieInstance?.resize()
 }
+
+onMounted(async () => {
+  initCharts()
+  await Promise.all([fetchStats(), fetchVisits()])
+  timer = setInterval(async () => {
+    await Promise.all([fetchStats(), fetchVisits()])
+  }, 60000)
+  window.addEventListener('resize', resizeCharts)
+})
 
 onUnmounted(() => {
   if (timer) clearInterval(timer)
@@ -337,22 +331,9 @@ onUnmounted(() => {
 .icon-green { color: #67C23A; border: 1px solid rgba(103, 194, 58, 0.3); }
 .icon-orange { color: #E6A23C; border: 1px solid rgba(230, 162, 60, 0.3); }
 
-.card-info {
-  flex: 1;
-}
-
-.stat-value {
-  font-size: 28px;
-  font-weight: 700;
-  color: #fff;
-  font-family: 'Orbitron', sans-serif;
-}
-
-.stat-label {
-  font-size: 14px;
-  color: rgba(255, 255, 255, 0.5);
-  margin-top: 4px;
-}
+.card-info { flex: 1; }
+.stat-value { font-size: 28px; font-weight: 700; color: #fff; font-family: 'Orbitron', sans-serif; }
+.stat-label { font-size: 14px; color: rgba(255, 255, 255, 0.5); margin-top: 4px; }
 
 .card-bg-glow {
   position: absolute;
@@ -371,11 +352,7 @@ onUnmounted(() => {
   height: 400px;
 }
 
-.chart-card {
-  display: flex;
-  flex-direction: column;
-}
-
+.chart-card { display: flex; flex-direction: column; }
 .wide { flex: 2; }
 .narrow { flex: 1; }
 
@@ -387,9 +364,5 @@ onUnmounted(() => {
   padding-left: 12px;
 }
 
-.chart-container {
-  flex: 1;
-  width: 100%;
-  min-height: 0;
-}
+.chart-container { flex: 1; width: 100%; min-height: 0; }
 </style>

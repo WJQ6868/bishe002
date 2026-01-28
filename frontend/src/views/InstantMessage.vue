@@ -887,8 +887,8 @@ const handleRefreshContacts = () => {
   justify-content: space-between;
   align-items: center;
   padding: 10px 12px;
-  border-bottom: 1px solid #E4E7ED;
-  background: #F5F7FA;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.06);
   font-size: 14px;
   font-weight: 500;
 }

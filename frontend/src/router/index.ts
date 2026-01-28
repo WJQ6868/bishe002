@@ -180,6 +180,12 @@ const routes: RouteRecordRaw[] = [
         meta: { title: '成绩管理', icon: 'Medal', roles: ['student'] }
       },
       {
+        path: 'student/ai-course-assistant',
+        name: 'StudentCourseAssistant',
+        component: () => import('../views/student/StudentCourseAssistant.vue'),
+        meta: { title: 'AI课程助手', icon: 'Search', roles: ['student'] }
+      },
+      {
         path: 'student/profile-center',
         name: 'StudentProfileCenter',
         component: () => import('../views/student/ProfileCenter.vue'),

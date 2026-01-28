@@ -446,11 +446,13 @@ onMounted(() => {
 }
 /* 禁用行样式 */
 :deep(.el-table .disabled-row) {
-  background: #f5f7fa;
-  color: #c0c4cc;
+  background: rgba(255, 255, 255, 0.06);
+}
+:deep(.el-table .disabled-row .cell) {
+  color: rgba(255, 255, 255, 0.5) !important;
 }
 /* Hover 效果 */
 :deep(.el-table__body tr:hover > td) {
-  background-color: #FFF7E6 !important;
+  background-color: rgba(255, 247, 230, 0.12) !important;
 }
 </style>
