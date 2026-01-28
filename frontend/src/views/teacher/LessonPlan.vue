@@ -140,8 +140,9 @@ const generatePlan = async () => {
       (chunk) => {
         planContent.value += chunk
       },
-      selectedModel.value,
-      selectedCourseId.value || undefined
+      undefined,
+      selectedCourseId.value || undefined,
+      'app:lesson_plan'
     )
     if (createdTaskId) {
       await aiPortalApi.updateLessonPlanTaskResult(createdTaskId, { status: 'completed', result: planContent.value })
@@ -340,10 +341,11 @@ const doDeleteKb = async (row: TeacherKbDocument) => {
         <el-form-item label="标题">
           <el-input v-model="planTitle" placeholder="例如：软件工程第一章教案" />
         </el-form-item>
-        <el-form-item label="使用模型">
-          <el-select v-model="selectedModel" placeholder="选择模型">
+        <el-form-item label="使用模型（管理员配置）">
+          <el-select v-model="selectedModel" placeholder="由管理员配置" :disabled="true">
             <el-option v-for="m in modelOptions" :key="m.value" :label="m.label" :value="m.value" />
           </el-select>
+          <div class="hint">由管理员在 AI 设置中配置，教师端只读</div>
         </el-form-item>
         <el-form-item label="课程大纲">
           <el-input v-model="syllabus" type="textarea" :rows="6" placeholder="粘贴课程大纲或关键要点" />
