@@ -21,6 +21,7 @@ from ..models.ai_config import (
     AiKnowledgeBaseSubject,
     AiLessonPlanTask,
     AiModelApi,
+    AiUsageLog,
     AiWorkflowApp,
     StudentCourseAiFavorite,
     StudentCourseAiSelection,
@@ -769,6 +770,14 @@ async def create_lesson_plan_task(
         model_api_id=app.model_api_id,
     )
     db.add(task)
+    db.add(
+        AiUsageLog(
+            feature="lesson_plan",
+            user_id=current_user.id,
+            user_role=current_user.role,
+            result="success",
+        )
+    )
     await db.commit()
     await db.refresh(task)
     return _lesson_plan_task_to_out(task)

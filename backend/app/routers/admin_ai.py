@@ -4,6 +4,7 @@ import json
 import os
 import re
 import uuid
+from datetime import datetime
 from typing import List, Optional
 
 import httpx
@@ -25,6 +26,7 @@ from ..models.ai_config import (
     AiFeatureSetting,
     AiModelApi,
     AiModelKnowledgeBaseLink,
+    AiUsageLog,
     AiWorkflowApp,
     StudentCourseAiSelection,
     TeacherKnowledgeBaseDocument,
@@ -51,6 +53,7 @@ from ..schemas.admin_ai import (
     AiModelApiTestResponse,
     AiModelApiUpdate,
     AiModelKbUpdateRequest,
+    AiUsageListOut,
     AiWorkflowAppOut,
     AiWorkflowAppUpdate,
     PublicAiModelOut,
@@ -1329,4 +1332,59 @@ async def student_select_course_ai(
 
     await db.commit()
     return StudentCourseAiSelectOut(course_id=course_id, model_api_id=model_api_id)
+
+
+def _parse_datetime(val: Optional[str], *, end_of_day: bool = False) -> Optional[datetime]:
+    if not val:
+        return None
+    raw = str(val).strip()
+    if not raw:
+        return None
+    try:
+        dt = datetime.fromisoformat(raw.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    if raw[:10].count("-") == 2 and len(raw) <= 10:
+        if end_of_day:
+            dt = dt.replace(hour=23, minute=59, second=59, microsecond=999999)
+        else:
+            dt = dt.replace(hour=0, minute=0, second=0, microsecond=0)
+    if dt.tzinfo:
+        dt = dt.replace(tzinfo=None)
+    return dt
+
+
+@router.get("/usage", response_model=AiUsageListOut)
+async def list_ai_usage(
+    start: Optional[str] = None,
+    end: Optional[str] = None,
+    limit: int = 10000,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(get_current_admin),
+):
+    limit = max(1, min(int(limit or 10000), 10000))
+    start_dt = _parse_datetime(start)
+    end_dt = _parse_datetime(end, end_of_day=True)
+
+    stmt = select(AiUsageLog).order_by(AiUsageLog.created_at.desc()).limit(limit)
+    if start_dt:
+        stmt = stmt.where(AiUsageLog.created_at >= start_dt)
+    if end_dt:
+        stmt = stmt.where(AiUsageLog.created_at <= end_dt)
+
+    res = await db.execute(stmt)
+    logs = res.scalars().all()
+    records = []
+    for log in reversed(logs):
+        role = (log.user_role or "unknown").strip()
+        if role not in {"student", "teacher"}:
+            role = "unknown"
+        records.append({
+            "ts": log.created_at,
+            "feature": log.feature,
+            "result": log.result,
+            "userType": role,
+        })
+
+    return AiUsageListOut(total=len(records), records=records)
 

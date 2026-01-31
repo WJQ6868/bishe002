@@ -25,11 +25,14 @@ from ..models.ai_config import (
 
     AiModelApi,
 
+    AiUsageLog,
+
     AiWorkflowApp,
 
     StudentCourseAiSelection,
 
 )
+from ..models.user import User
 
 from ..schemas.ai import QARequest
 
@@ -157,6 +160,44 @@ def _safe_int(s: str) -> int | None:
     except Exception:
 
         return None
+
+
+async def _resolve_user_info(db: AsyncSession, user_key: str) -> tuple[int | None, str]:
+    raw = (user_key or "").strip()
+    if not raw:
+        return None, "unknown"
+    uid = _safe_int(raw)
+    user = None
+    if uid is not None:
+        user = (await db.execute(select(User).where(User.id == uid))).scalars().first()
+    if not user:
+        user = (await db.execute(select(User).where(User.username == raw))).scalars().first()
+    if not user:
+        return uid, "unknown"
+    return user.id, user.role or "unknown"
+
+
+async def _safe_log_usage(
+    db: AsyncSession,
+    *,
+    feature: str,
+    user_id: str,
+    result: str,
+    message: str | None = None,
+) -> None:
+    try:
+        uid, role = await _resolve_user_info(db, user_id)
+        log = AiUsageLog(
+            feature=feature,
+            user_id=uid,
+            user_role=role or "unknown",
+            result=result,
+            message=message,
+        )
+        db.add(log)
+        await db.commit()
+    except Exception:
+        await db.rollback()
 
 
 
@@ -710,6 +751,8 @@ async def stream_qa(request: QARequest, db: AsyncSession = Depends(get_db)):
     if not request.question.strip():
         raise HTTPException(status_code=400, detail="Question cannot be empty")
 
+    feature_key = "course_assistant"
+
     # 先按 workflow 指定工作流；否则退回默认课程助手
     app_code = (request.workflow or "").strip()
     if app_code.startswith("app:"):
@@ -726,12 +769,21 @@ async def stream_qa(request: QARequest, db: AsyncSession = Depends(get_db)):
     if not app:
         if app_code:
             gen = _sse_single_message(f"未找到或未启用工作流：{app_code}")
+            await _safe_log_usage(
+                db,
+                feature=feature_key,
+                user_id=request.user_id,
+                result="failed",
+                message=f"workflow_not_found:{app_code}",
+            )
             return StreamingResponse(gen, media_type="text/event-stream")
         app = await _get_or_create_app(db, code="course_assistant", name="AI课程助手", app_type="course_assistant")
 
     app_settings = _load_json_settings(app.settings_json)
     app_type = (app.type or "course_assistant").strip() or "course_assistant"
     feature_label = "AI 课程助手" if app_type == "course_assistant" else "智能教案"
+    if app_type in {"course_assistant", "lesson_plan"}:
+        feature_key = app_type
 
     # 优先使用学生课程自选模型
     selected_model: AiModelApi | None = None
@@ -761,6 +813,13 @@ async def stream_qa(request: QARequest, db: AsyncSession = Depends(get_db)):
 
     if not _model_api_ready(selected_model):
         gen = _sse_single_message(f"{feature_label}未配置可用模型或缺少 API Key，请在后台启用并填写密钥。")
+        await _safe_log_usage(
+            db,
+            feature=feature_key,
+            user_id=request.user_id,
+            result="failed",
+            message="model_not_ready",
+        )
         return StreamingResponse(gen, media_type="text/event-stream")
 
     # 优先课程专属KB，再基础KB
@@ -791,11 +850,24 @@ async def stream_qa(request: QARequest, db: AsyncSession = Depends(get_db)):
         gen = _dashscope_client.call_stream_api(request.user_id, final_question, request.history_flag)
 
     try:
+        await _safe_log_usage(
+            db,
+            feature=feature_key,
+            user_id=request.user_id,
+            result="success",
+        )
         return StreamingResponse(
             _with_completion(gen, selected_model, final_question, f"{feature_label}未返回内容，请检查模型连通性或稍后重试。"),
             media_type="text/event-stream",
         )
     except Exception as e:
+        await _safe_log_usage(
+            db,
+            feature=feature_key,
+            user_id=request.user_id,
+            result="failed",
+            message=str(e),
+        )
         err = _sse_single_message(f"{feature_label}调用失败: {e}")
         return StreamingResponse(err, media_type="text/event-stream")
 
@@ -803,6 +875,8 @@ async def stream_qa(request: QARequest, db: AsyncSession = Depends(get_db)):
 async def stream_customer_service(request: QARequest, db: AsyncSession = Depends(get_db)):
     if not request.question.strip():
         raise HTTPException(status_code=400, detail="Question cannot be empty")
+
+    feature_key = "customer_service"
 
     # workflow 优先：app:{code} 或直接 code
     app_code = (request.workflow or "").strip() or (request.model or "").strip()
@@ -828,6 +902,13 @@ async def stream_customer_service(request: QARequest, db: AsyncSession = Depends
 
     if not _model_api_ready(selected_model):
         gen = _sse_single_message("AI 客服未配置可用模型或缺少 API Key，请在后台启用并填写密钥。")
+        await _safe_log_usage(
+            db,
+            feature=feature_key,
+            user_id=request.user_id,
+            result="failed",
+            message="model_not_ready",
+        )
         return StreamingResponse(gen, media_type="text/event-stream")
 
     kb_ids: List[int] = []
@@ -846,5 +927,18 @@ async def stream_customer_service(request: QARequest, db: AsyncSession = Depends
     # 改为非流式直接返回文本
     text = await _completion_async(selected_model, final_question)
     if not text:
+        await _safe_log_usage(
+            db,
+            feature=feature_key,
+            user_id=request.user_id,
+            result="failed",
+            message="empty_response",
+        )
         return {"content": "", "message": "AI 客服未返回内容，请检查模型连通性或稍后重试。"}
+    await _safe_log_usage(
+        db,
+        feature=feature_key,
+        user_id=request.user_id,
+        result="success",
+    )
     return {"content": text}

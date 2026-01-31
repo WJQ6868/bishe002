@@ -32,7 +32,14 @@ const viewSource = ref<'db' | 'preview'>('db')
 
 const weekDays = ['周一', '周二', '周三', '周四', '周五']
 const periods = ['1', '2', '3', '4', '5', '6']
-const colors = ['#ecf5ff', '#f0f9eb', '#fdf6ec', '#fef0f0', '#e8f3ff', '#fff7e6']
+const colors = [
+  'rgba(0, 242, 254, 0.18)',
+  'rgba(64, 158, 255, 0.18)',
+  'rgba(103, 194, 58, 0.18)',
+  'rgba(230, 162, 60, 0.18)',
+  'rgba(245, 108, 108, 0.16)',
+  'rgba(144, 147, 153, 0.16)'
+]
 
 const { rows, loading: tableLoading, reloadTables } = useTables(['schedules', 'courses', 'teachers', 'classrooms'])
 
@@ -291,7 +298,7 @@ const generateSchedule = async () => {
   generateLoading.value = true
   try {
     const payload = buildGeneratePayload()
-    const { data } = await axios.post('/api/schedule/generate', payload)
+    const { data } = await axios.post('/schedule/generate', payload)
     previewEntries.value = data.entries || []
     gaStats.value = {
       fitness: data.fitness,
@@ -324,7 +331,7 @@ const saveSchedule = async () => {
 
   saveLoading.value = true
   try {
-    await axios.post('/api/schedule/save', {
+    await axios.post('/schedule/save', {
       entries: previewEntries.value,
       clear_existing: true
     })
@@ -527,8 +534,8 @@ const handleExport = () => {
                 </el-tag>
               </div>
               <div class="legend">
-                <span class="legend-dot" style="background: #f0f9eb"></span> 空闲
-                <span class="legend-dot" style="background: #ecf5ff; margin-left: 10px"></span> 已排
+                <span class="legend-dot idle-dot"></span> 空闲
+                <span class="legend-dot busy-dot" style="margin-left: 10px"></span> 已排
               </div>
             </div>
           </template>
@@ -670,6 +677,14 @@ const handleExport = () => {
   margin-right: 5px;
   border: 1px solid var(--border-color);
 }
+.idle-dot {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.15);
+}
+.busy-dot {
+  background: rgba(0, 242, 254, 0.3);
+  border-color: rgba(0, 242, 254, 0.45);
+}
 .view-tag {
   margin-left: auto;
 }
@@ -694,10 +709,13 @@ const handleExport = () => {
   justify-content: center;
   border-radius: 4px;
   font-size: 12px;
+  border: 1px solid rgba(0, 242, 254, 0.12);
+  box-shadow: inset 0 0 12px rgba(0, 0, 0, 0.25);
 }
 .cell-content {
   text-align: center;
   line-height: 1.4;
+  color: rgba(255, 255, 255, 0.9);
 }
 .c-name {
   font-weight: bold;

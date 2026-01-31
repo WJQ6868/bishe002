@@ -321,3 +321,15 @@ class AiLessonPlanTask(Base):
 
     knowledge_base = relationship("AiKnowledgeBase", back_populates="lesson_plan_tasks")
     model = relationship("AiModelApi", back_populates="lesson_plan_tasks")
+
+
+class AiUsageLog(Base):
+    __tablename__ = "ai_usage_logs"
+
+    id = Column(Integer, primary_key=True, index=True)
+    feature = Column(String(50), nullable=False, index=True)  # customer_service / course_assistant / lesson_plan
+    user_id = Column(Integer, nullable=True, index=True)
+    user_role = Column(String(20), nullable=False, default="unknown", index=True)  # student / teacher / admin / unknown
+    result = Column(String(20), nullable=False, default="success")  # success / failed
+    message = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow, index=True)

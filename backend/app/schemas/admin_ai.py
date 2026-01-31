@@ -254,3 +254,15 @@ class StudentCourseAiSelectRequest(BaseModel):
 class StudentCourseAiSelectOut(BaseModel):
     course_id: int
     model_api_id: Optional[int] = None
+
+
+class AiUsageRecordOut(BaseModel):
+    ts: datetime
+    feature: str
+    result: str
+    userType: str = Field(..., description="student/teacher/unknown")
+
+
+class AiUsageListOut(BaseModel):
+    total: int = 0
+    records: List[AiUsageRecordOut] = Field(default_factory=list)
