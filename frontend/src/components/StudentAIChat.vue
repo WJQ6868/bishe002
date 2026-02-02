@@ -1,14 +1,11 @@
 <script setup lang="ts">
 import { ref, reactive, onMounted, nextTick, computed, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { streamCustomerServiceQA } from '@/api/ai'
-import { aiPortalApi, type CustomerServiceConfig, type PublicAiModelApi, type StudentCourseAiItem } from '@/api/aiPortal'
 import { 
   ChatRound, Plus, Delete, Edit, MoreFilled, 
   Microphone, FolderAdd, Picture, Document, 
   CopyDocument, RefreshRight, Back, Close,
-  ArrowDown, Timer, Monitor, Cpu, ChatDotRound,
-  Star, StarFilled
+  ArrowDown, Timer, Monitor, Cpu, ChatDotRound
 } from '@element-plus/icons-vue'
 import { marked } from 'marked'
 import hljs from 'highlight.js'
@@ -67,53 +64,16 @@ const currentSession = computed(() => sessions.value.find(s => s.id === currentS
 
 // 模型相关
 const availableModels = ref<ModelAuth[]>([])
-const workflowApps = ref<any[]>([])
 const allowUserSwitchModel = ref(true)
 const keepSessionOnSwitch = ref(true)
 
-// 学生专属课程 AI
-const courseAiItems = ref<StudentCourseAiItem[]>([])
-const publicModelApis = ref<PublicAiModelApi[]>([])
-const activeCourseId = ref<number | null>(null)
-const courseModelSelect = ref<number | null>(null)
-const loadingCourses = ref(false)
-
-const activeCourse = computed(() => courseAiItems.value.find(c => c.course_id === activeCourseId.value) || null)
-const activeCourseLabel = computed(() => activeCourse.value ? `${activeCourse.value.course_name} 专属AI` : '')
-const activeCourseTeacher = computed(() => activeCourse.value ? activeCourse.value.teacher_name : '')
-const activeCourseKbTime = computed(() => {
-  const t = activeCourse.value?.teacher_kb_updated_at
-  return t ? String(t).slice(0, 19).replace('T', ' ') : '暂无'
-})
-
 // 快捷提问
-const quickQuestions = ref<string[]>([
+const quickQuestions = [
   '如何退课？',
   '绩点计算规则？',
   '选课冲突怎么办？',
   '奖学金申请条件？'
-])
-
-const customerServiceConfig = reactive<CustomerServiceConfig>({
-  welcome_str: '同学你好！我是你的智能教务助手，有什么可以帮你的吗？',
-  recommend_questions: quickQuestions.value,
-  search_placeholder: '输入您的问题，支持语音、文件辅助说明...',
-  system_prompt_template: null
-})
-
-const inputPlaceholder = computed(() => customerServiceConfig.search_placeholder || '输入您的问题，支持语音、文件辅助说明...')
-
-const loadCustomerServiceConfig = async () => {
-  try {
-    const cfg = await aiPortalApi.getCustomerServiceConfig()
-    customerServiceConfig.welcome_str = cfg.welcome_str || customerServiceConfig.welcome_str
-    customerServiceConfig.search_placeholder = cfg.search_placeholder || customerServiceConfig.search_placeholder
-    customerServiceConfig.recommend_questions = cfg.recommend_questions?.length ? cfg.recommend_questions : customerServiceConfig.recommend_questions
-    quickQuestions.value = customerServiceConfig.recommend_questions
-  } catch {
-    // ignore
-  }
-}
+]
 
 // 管理员配置
 const aiConfig = reactive({
@@ -126,103 +86,10 @@ const aiConfig = reactive({
 
 // --- 3. 核心逻辑 ---
 
-onMounted(async () => {
+onMounted(() => {
   initData()
   initSpeechRecognition()
-  loadCourseAi()
-  await loadPublicModels()
-  loadSessionsFromStorage()
-  loadCustomerServiceConfig()
 })
-
-const loadPublicModels = async () => {
-  try {
-    const [apps, models] = await Promise.all([
-      aiPortalApi.listCustomerServiceApps(),
-      aiPortalApi.listPublicModelApis()
-    ])
-    workflowApps.value = apps
-    publicModelApis.value = models
-
-    const workflowOptions = apps.map((a: any) => ({
-      model: `app:${a.code}`,
-      name: a.name || a.code,
-      isConfigured: true,
-      studentAuth: true
-    }))
-    const modelOptions = models.map(m => ({
-      model: `db:${m.id}`,
-      name: `${m.name}（${m.model_name}）`,
-      isConfigured: true,
-      studentAuth: true
-    }))
-    availableModels.value = [...workflowOptions, ...modelOptions]
-
-    // 默认选第一个工作流，否则默认模型
-    if (!currentSessionId.value) {
-      const first = workflowOptions[0] || modelOptions[0]
-      if (first) {
-        const now = Date.now()
-        sessions.value = [{
-          id: 's-' + now,
-          title: '未命名会话',
-          messages: [],
-          timestamp: now,
-          unread: false,
-          model: first.model
-        }]
-        currentSessionId.value = sessions.value[0].id
-      }
-    }
-  } catch {
-    // 保持原有 localStorage 兜底
-  }
-}
-
-const loadCourseAi = async () => {
-  // 仅学生有“专属课程AI”
-  if (localStorage.getItem('user_role') !== 'student') return
-  loadingCourses.value = true
-  try {
-    const items = await aiPortalApi.listStudentCourseAis()
-    courseAiItems.value = items
-    // 默认：优先收藏，其次第一门课
-    if (!activeCourseId.value) {
-      const fav = items.find(x => x.favorite)
-      activeCourseId.value = (fav || items[0])?.course_id ?? null
-    }
-    const cur = items.find(x => x.course_id === activeCourseId.value)
-    courseModelSelect.value = cur?.selected_model_api_id ?? null
-  } finally {
-    loadingCourses.value = false
-  }
-}
-
-const setActiveCourse = (courseId: number) => {
-  activeCourseId.value = courseId
-  const cur = courseAiItems.value.find(x => x.course_id === courseId)
-  courseModelSelect.value = cur?.selected_model_api_id ?? null
-}
-
-const saveCourseModel = async () => {
-  if (!activeCourseId.value) return
-  try {
-    await aiPortalApi.selectStudentCourseAi(activeCourseId.value, courseModelSelect.value)
-    ElMessage.success('已保存课程模型')
-    await loadCourseAi()
-  } catch {
-    ElMessage.error('保存失败')
-  }
-}
-
-const toggleFavoriteCourse = async (courseId: number, to: boolean) => {
-  try {
-    await aiPortalApi.favoriteStudentCourseAi(courseId, to)
-    await loadCourseAi()
-  } catch {
-    ElMessage.error('操作失败')
-  }
-}
 
 const initData = () => {
   // 1. 读取配置
@@ -247,25 +114,15 @@ const initData = () => {
     availableModels.value = [{ model: 'tongyi', name: '通义千问', isConfigured: true, studentAuth: true }]
   }
 
-  loadSessionsFromStorage()
-}
-
-const sessionStorageKey = () => {
-  const uid = localStorage.getItem('user_id') || 'student'
-  return `student_ai_sessions_${uid}`
-}
-
-const loadSessionsFromStorage = () => {
-  try {
-    const savedSessions = localStorage.getItem(sessionStorageKey())
-    if (savedSessions) {
-      sessions.value = JSON.parse(savedSessions)
-    }
-  } catch {
-    sessions.value = []
+  // 2. 读取会话历史
+  const savedSessions = localStorage.getItem('student_ai_sessions')
+  if (savedSessions) {
+    sessions.value = JSON.parse(savedSessions)
   }
-
+  
+  // 如果没有会话，创建默认会话
   if (sessions.value.length === 0) {
+    // 预设历史会话
     createPresetSessions()
   } else {
     currentSessionId.value = sessions.value[0].id
@@ -332,7 +189,7 @@ const initSpeechRecognition = () => {
 
 // 会话持久化
 watch(sessions, (newVal) => {
-  localStorage.setItem(sessionStorageKey(), JSON.stringify(newVal))
+  localStorage.setItem('student_ai_sessions', JSON.stringify(newVal))
 }, { deep: true })
 
 // 切换显示
@@ -354,7 +211,7 @@ const createNewSession = () => {
     messages: [{
       id: 'welcome',
       role: 'ai',
-      content: customerServiceConfig.welcome_str || '同学你好！我是你的智能教务助手，有什么可以帮你的吗？',
+      content: '同学你好！我是你的智能教务助手，有什么可以帮你的吗？',
       timestamp: now,
       modelName: '系统'
     }],
@@ -449,6 +306,7 @@ const handleModelSwitch = (modelKey: string) => {
   scrollToBottom()
 }
 
+// 发送消息
 const handleSend = async (content: string = inputContent.value) => {
   if (!content.trim() || !currentSession.value) return
 
@@ -472,6 +330,7 @@ const handleSend = async (content: string = inputContent.value) => {
   scrollToBottom()
   loading.value = true
 
+  // 2. 模拟 AI 响应
   const aiMsgId = (Date.now() + 1).toString()
   const modelKey = currentSession.value.model
   const modelName = availableModels.value.find(m => m.model === modelKey)?.name || 'AI'
@@ -485,26 +344,37 @@ const handleSend = async (content: string = inputContent.value) => {
     modelName: modelName
   }
   currentSession.value.messages.push(aiMsg)
-  try {
-    const uid = localStorage.getItem('user_id') || '0'
-    // 若选择了课程，则优先使用“该课程绑定的模型”
-    const courseModelId = activeCourse.value?.selected_model_api_id
-    const modelToUse = courseModelId ? `db:${courseModelId}` : (modelKey.startsWith('db:') ? modelKey : undefined)
-    const workflowCode = modelKey.startsWith('app:') ? modelKey.slice(4) : undefined
-    const got = await streamCustomerServiceQA(uid, content, true, (t) => {
-      aiMsg.content += t
-      scrollToBottom()
-    }, modelToUse, activeCourseId.value || undefined, workflowCode)
-    if (!got) {
-      aiMsg.content = 'AI客服未返回内容，请检查模型接口、API Key 或网络连通性。'
-    }
-  } catch (e) {
-    aiMsg.content = 'AI服务不可用，请稍后重试'
-    ElMessage.error('AI服务不可用')
-  } finally {
-    aiMsg.isStreaming = false
-    loading.value = false
+
+  // 模拟响应内容
+  let fullResponse = ''
+  
+  // 简单的关键词匹配逻辑
+  if (content.includes('退课')) {
+    fullResponse = `### 退课流程说明\n\n1. 登录教务系统\n2. 进入 **选课管理** -> **我的课程**\n3. 找到对应课程，点击“退课”按钮\n\n> 注意：退课需在开学后两周内完成，逾期将无法退课。`
+  } else if (content.includes('绩点')) {
+    fullResponse = `### 绩点计算规则\n\n平均学分绩点 (GPA) 计算公式：\n\n$$ GPA = \\frac{\\sum(课程绩点 \\times 学分)}{\\sum 学分} $$\n\n**绩点对照表**：\n| 分数 | 绩点 |\n|---|---|\n| 90-100 | 4.0 |\n| 85-89 | 3.7 |\n| 82-84 | 3.3 |`
+  } else if (content.includes('代码') || content.includes('python')) {
+    fullResponse = `好的，这是一个 Python 成绩统计的示例代码：\n\n\`\`\`python\ndef calculate_average(scores):\n    if not scores:\n        return 0\n    return sum(scores) / len(scores)\n\nscores = [85, 92, 78, 90]\nprint(f"平均分: {calculate_average(scores)}")\n\`\`\``
+  } else {
+    fullResponse = `(由 ${modelName} 生成) 收到您的问题：“${content}”。\n正在为您查询相关教务规定...`
   }
+
+  // 流式模拟
+  const chars = fullResponse.split('')
+  let index = 0
+  const speed = 30
+
+  const streamInterval = setInterval(() => {
+    if (index < chars.length) {
+      aiMsg.content += chars[index]
+      index++
+      scrollToBottom()
+    } else {
+      clearInterval(streamInterval)
+      aiMsg.isStreaming = false
+      loading.value = false
+    }
+  }, speed) 
 }
 
 // 语音输入
@@ -629,32 +499,6 @@ const currentModelName = computed(() => {
               新建会话
             </el-button>
           </div>
-
-          <!-- 专属课程 AI（按课程展示 + 教师/知识库更新时间 + 收藏） -->
-          <div class="course-ai" v-loading="loadingCourses" v-if="courseAiItems.length">
-            <div class="course-ai-title">专属课程 AI</div>
-            <div
-              v-for="c in courseAiItems"
-              :key="c.course_id"
-              class="course-ai-item"
-              :class="{ active: activeCourseId === c.course_id }"
-              @click="setActiveCourse(c.course_id)"
-            >
-              <div class="course-ai-main">
-                <div class="course-ai-row">
-                  <span class="course-ai-name">{{ c.course_name }} 专属AI</span>
-                  <el-icon
-                    class="course-ai-star"
-                    @click.stop="toggleFavoriteCourse(c.course_id, !c.favorite)"
-                  >
-                    <StarFilled v-if="c.favorite" />
-                    <Star v-else />
-                  </el-icon>
-                </div>
-                <div class="course-ai-meta">教师：{{ c.teacher_name }}；知识库更新：{{ (c.teacher_kb_updated_at || '').slice(0, 19).replace('T',' ') || '暂无' }}</div>
-              </div>
-            </div>
-          </div>
           
           <div class="session-list">
             <div 
@@ -690,19 +534,9 @@ const currentModelName = computed(() => {
             <div class="header-left">
               <span class="current-title">{{ currentSession?.title }}</span>
               <el-icon class="edit-icon" @click="renameSession"><Edit /></el-icon>
-              <span v-if="activeCourse" class="course-badge">{{ activeCourseLabel }}</span>
             </div>
             
             <div class="header-right">
-              <!-- 课程模型选择（与课程绑定，不影响普通会话模型） -->
-              <div v-if="activeCourse" class="course-model">
-                <span class="course-model-label">本课程模型</span>
-                <el-select v-model="courseModelSelect" placeholder="默认" style="width: 220px" @change="saveCourseModel">
-                  <el-option :value="null" label="默认（跟随系统）" />
-                  <el-option v-for="m in publicModelApis" :key="m.id" :label="`${m.name}（${m.model_name}）`" :value="m.id" />
-                </el-select>
-              </div>
-
               <!-- 模型选择 -->
               <el-dropdown trigger="click" @command="handleModelSwitch" v-if="allowUserSwitchModel">
                 <span class="model-select">
@@ -801,7 +635,7 @@ const currentModelName = computed(() => {
               <textarea 
                 v-model="inputContent"
                 class="custom-input"
-                :placeholder="inputPlaceholder"
+                placeholder="输入您的问题，支持语音、文件辅助说明..."
                 @keydown.enter.prevent="handleSend()"
               ></textarea>
               
@@ -826,10 +660,10 @@ const currentModelName = computed(() => {
 :deep(.markdown-body) {
   font-size: 14px;
   line-height: 1.6;
-  color: var(--el-text-color-regular);
+  color: #333;
 }
 :deep(.markdown-body pre) {
-  background: rgba(255, 255, 255, 0.06);
+  background: #f5f5f5;
   padding: 10px;
   border-radius: 6px;
   overflow-x: auto;
@@ -844,11 +678,11 @@ const currentModelName = computed(() => {
   margin: 10px 0;
 }
 :deep(.markdown-body th), :deep(.markdown-body td) {
-  border: 1px solid var(--border-color);
+  border: 1px solid #ddd;
   padding: 6px 10px;
 }
 :deep(.markdown-body a) {
-  color: var(--primary-color);
+  color: #409EFF;
   text-decoration: none;
 }
 
@@ -896,19 +730,18 @@ const currentModelName = computed(() => {
 .chat-modal {
   width: 1000px;
   height: 800px;
-  background: var(--card-bg);
+  background: #fff;
   border-radius: 12px;
   display: flex;
   overflow: hidden;
-  border: 1px solid var(--border-color);
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
 }
 
 /* 左侧边栏 */
 .sidebar {
   width: 280px;
-  background: var(--card-bg);
-  border-right: 1px solid var(--border-color);
+  background: #f7f8fa;
+  border-right: 1px solid #eef0f3;
   display: flex;
   flex-direction: column;
 }
@@ -922,70 +755,10 @@ const currentModelName = computed(() => {
 .app-name {
   font-size: 18px;
   font-weight: bold;
-  color: var(--el-text-color-primary);
+  color: #333;
 }
 .new-chat-btn {
   border-radius: 16px;
-}
-
-/* 专属课程 AI */
-.course-ai {
-  padding: 0 12px 10px;
-}
-.course-ai-title {
-  font-size: 12px;
-  color: var(--el-text-color-secondary);
-  margin: 6px 0 8px;
-}
-.course-ai-item {
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid var(--border-color);
-  border-radius: 10px;
-  padding: 10px;
-  margin-bottom: 8px;
-  cursor: pointer;
-}
-.course-ai-item.active {
-  border-color: var(--primary-color);
-  background: rgba(255, 255, 255, 0.06);
-}
-.course-ai-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-.course-ai-name {
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--el-text-color-primary);
-}
-.course-ai-meta {
-  margin-top: 6px;
-  font-size: 12px;
-  color: var(--el-text-color-secondary);
-}
-.course-ai-star {
-  color: #f7b500;
-}
-
-.course-badge {
-  margin-left: 10px;
-  font-size: 12px;
-  color: #409EFF;
-  background: rgba(64, 158, 255, 0.12);
-  padding: 2px 8px;
-  border-radius: 999px;
-}
-
-.course-model {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-right: 12px;
-}
-.course-model-label {
-  font-size: 12px;
-  color: var(--el-text-color-secondary);
 }
 
 .session-list {
@@ -1003,11 +776,11 @@ const currentModelName = computed(() => {
   position: relative;
 }
 .session-card:hover {
-  background: rgba(255, 255, 255, 0.06);
+  background: #eef0f3;
   box-shadow: 0 2px 8px rgba(0,0,0,0.05);
 }
 .session-card.active {
-  background: rgba(255, 255, 255, 0.08);
+  background: #E6F7FF;
 }
 .session-title-row {
   display: flex;
@@ -1016,7 +789,7 @@ const currentModelName = computed(() => {
 }
 .session-title {
   font-size: 14px;
-  color: var(--el-text-color-primary);
+  color: #333;
   font-weight: 500;
   white-space: nowrap;
   overflow: hidden;
@@ -1029,7 +802,7 @@ const currentModelName = computed(() => {
 }
 .session-preview {
   font-size: 12px;
-  color: var(--el-text-color-secondary);
+  color: #666;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1046,7 +819,7 @@ const currentModelName = computed(() => {
 
 .sidebar-footer {
   padding: 15px;
-  border-top: 1px solid var(--border-color);
+  border-top: 1px solid #eef0f3;
   text-align: center;
 }
 
@@ -1055,12 +828,12 @@ const currentModelName = computed(() => {
   flex: 1;
   display: flex;
   flex-direction: column;
-  background: var(--card-bg);
+  background: #fff;
 }
 
 .chat-header {
   height: 60px;
-  border-bottom: 1px solid var(--border-color);
+  border-bottom: 1px solid #f0f0f0;
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -1087,26 +860,26 @@ const currentModelName = computed(() => {
 }
 .model-select {
   cursor: pointer;
-  color: var(--el-text-color-regular);
+  color: #606266;
   display: flex;
   align-items: center;
   gap: 4px;
   font-size: 14px;
 }
-.model-select:hover { color: var(--primary-color); }
+.model-select:hover { color: #409EFF; }
 .more-btn, .close-btn {
   font-size: 20px;
   cursor: pointer;
-  color: var(--el-text-color-secondary);
+  color: #909399;
 }
-.more-btn:hover, .close-btn:hover { color: var(--el-text-color-primary); }
+.more-btn:hover, .close-btn:hover { color: #333; }
 
 /* 消息区 */
 .messages-area {
   flex: 1;
   overflow-y: auto;
   padding: 20px;
-  background: transparent;
+  background: #FAFAFA;
   display: flex;
   flex-direction: column;
   gap: 20px;
@@ -1134,7 +907,7 @@ const currentModelName = computed(() => {
   justify-content: center;
   flex-shrink: 0;
 }
-.ai .avatar { background: rgba(255, 255, 255, 0.06); color: var(--primary-color); border: 1px solid var(--border-color); }
+.ai .avatar { background: #fff; color: #409EFF; border: 1px solid #e0e0e0; }
 .user-avatar { background: #409EFF; color: #fff; font-size: 12px; }
 
 .message-content-wrapper {
@@ -1152,9 +925,8 @@ const currentModelName = computed(() => {
   box-shadow: 0 1px 2px rgba(0,0,0,0.05);
 }
 .ai .bubble { 
-  background: rgba(255, 255, 255, 0.06);
-  color: var(--el-text-color-primary);
-  border: 1px solid var(--border-color);
+  background: #fff; 
+  color: #333;
   border-top-left-radius: 2px;
 }
 .user .bubble { 
@@ -1210,8 +982,8 @@ const currentModelName = computed(() => {
 /* 输入区 */
 .input-area {
   padding: 20px;
-  background: var(--card-bg);
-  border-top: 1px solid var(--border-color);
+  background: #fff;
+  border-top: 1px solid #f0f0f0;
 }
 
 .quick-tags {
@@ -1228,17 +1000,17 @@ const currentModelName = computed(() => {
 }
 
 .input-box {
-  border: 1px solid var(--border-color);
+  border: 1px solid #dcdfe6;
   border-radius: 24px;
   padding: 10px 15px;
   display: flex;
   align-items: flex-end;
   gap: 10px;
   transition: all 0.2s;
-  background: rgba(255, 255, 255, 0.04);
+  background: #fff;
 }
 .input-box:focus-within {
-  border-color: var(--primary-color);
+  border-color: #409EFF;
   box-shadow: 0 0 0 2px rgba(64, 158, 255, 0.1);
 }
 
@@ -1249,11 +1021,11 @@ const currentModelName = computed(() => {
 }
 .tool-icon {
   font-size: 20px;
-  color: var(--el-text-color-secondary);
+  color: #909399;
   cursor: pointer;
   transition: color 0.2s;
 }
-.tool-icon:hover { color: var(--primary-color); }
+.tool-icon:hover { color: #409EFF; }
 .tool-icon.recording { color: #F56C6C; animation: pulse 1.5s infinite; }
 
 .custom-input {
@@ -1265,10 +1037,9 @@ const currentModelName = computed(() => {
   padding: 8px 0;
   font-size: 14px;
   line-height: 1.5;
-  color: var(--el-text-color-primary);
-  background: transparent;
+  color: #333;
 }
-.custom-input::placeholder { color: var(--el-text-color-secondary); }
+.custom-input::placeholder { color: #C0C4CC; }
 
 .send-btn {
   border-radius: 20px;

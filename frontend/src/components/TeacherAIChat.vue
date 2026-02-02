@@ -1,23 +1,29 @@
 <script setup lang="ts">
 import { ref, reactive, onMounted, nextTick, computed, watch } from 'vue'
 import { useRouter } from 'vue-router'
-import { ElLoading, ElMessage, ElMessageBox } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { 
   ChatRound, Plus, Delete, Edit, MoreFilled, 
-  Microphone, FolderAdd, Picture,
-  RefreshRight, Close,
-  ArrowDown, Cpu, ChatDotRound,
+  Microphone, FolderAdd, Picture, Document, 
+  CopyDocument, RefreshRight, Back, Close,
+  ArrowDown, Timer, Monitor, Cpu, ChatDotRound,
   Download, DataLine, AlarmClock
 } from '@element-plus/icons-vue'
 import { marked } from 'marked'
-import { streamCustomerServiceQA } from '@/api/ai'
-import { aiPortalApi, type PublicAiModelApi } from '@/api/aiPortal'
+import hljs from 'highlight.js'
+import 'highlight.js/styles/github.css'
 import * as echarts from 'echarts'
 
 const router = useRouter()
 
 // 配置 marked
 marked.setOptions({
+  highlight: function (code, lang) {
+    if (lang && hljs.getLanguage(lang)) {
+      return hljs.highlight(code, { language: lang }).value
+    }
+    return hljs.highlightAuto(code).value
+  },
   breaks: true
 })
 
@@ -53,11 +59,6 @@ interface ModelAuth {
   teacherAuth: boolean
 }
 
-interface SceneShortcut {
-  label: string
-  prompt: string
-}
-
 // --- 2. 状态管理 ---
 const isVisible = ref(false)
 const inputContent = ref('')
@@ -80,20 +81,16 @@ const currentSession = computed(() => sessions.value.find(s => s.id === currentS
 
 // 模型相关
 const availableModels = ref<ModelAuth[]>([])
-const workflowApps = ref<any[]>([])
 const allowUserSwitchModel = ref(true)
 const keepSessionOnSwitch = ref(true)
 
 // 场景快捷入口
-const sceneShortcuts = ref<SceneShortcut[]>([
+const sceneShortcuts = [
   { label: '教案生成', prompt: '生成Python编程课程第3章教案，含教学目标、重难点、教学步骤' },
   { label: '成绩分析', prompt: '请分析上传的成绩表格，计算平均分、及格率并生成统计图表' },
   { label: '资源预约咨询', prompt: '我想预约下周三下午的计算机实验室，有哪些可用资源？' },
   { label: '教学问题解答', prompt: '如何提高学生在编程课上的互动积极性？' }
-])
-
-const welcomeStr = ref('老师您好！我是您的智能教学助手，可以帮您生成教案、分析成绩或预约资源。')
-const inputPlaceholder = ref('输入您的问题，支持语音、文件辅助说明...')
+]
 
 // 管理员配置
 const aiConfig = reactive({
@@ -109,55 +106,7 @@ const aiConfig = reactive({
 onMounted(() => {
   initData()
   initSpeechRecognition()
-  loadPublicModels()
-  loadCustomerServiceConfig()
 })
-
-const loadCustomerServiceConfig = async () => {
-  try {
-    const cfg = await aiPortalApi.getCustomerServiceConfig()
-    if (cfg?.welcome_str) {
-      welcomeStr.value = cfg.welcome_str
-    }
-    if (cfg?.search_placeholder) {
-      inputPlaceholder.value = cfg.search_placeholder
-    }
-    if (Array.isArray(cfg?.recommend_questions) && cfg.recommend_questions.length > 0) {
-      sceneShortcuts.value = cfg.recommend_questions.slice(0, 12).map((q) => {
-        const trimmed = String(q || '').trim()
-        const label = trimmed.length > 12 ? trimmed.slice(0, 12) + '...' : trimmed
-        return { label: label || '推荐问题', prompt: trimmed }
-      }).filter((x) => !!x.prompt)
-    }
-  } catch {
-    // 保持默认值
-  }
-}
-
-const loadPublicModels = async () => {
-  try {
-    const [apps, models] = await Promise.all([
-      aiPortalApi.listCustomerServiceApps(),
-      aiPortalApi.listPublicModelApis()
-    ])
-    workflowApps.value = apps
-    const workflowOptions = apps.map((a: any) => ({
-      model: `app:${a.code}`,
-      name: a.name || a.code,
-      isConfigured: true,
-      teacherAuth: true
-    }))
-    const modelOptions = models.map((m: PublicAiModelApi) => ({
-      model: `db:${m.id}`,
-      name: `${m.name}（${m.model_name}）`,
-      isConfigured: true,
-      teacherAuth: true
-    }))
-    availableModels.value = [...workflowOptions, ...modelOptions]
-  } catch {
-    // 保持原有 localStorage 兜底
-  }
-}
 
 const initData = () => {
   // 1. 读取配置
@@ -188,21 +137,7 @@ const initData = () => {
   }
   
   if (sessions.value.length === 0) {
-    const first = availableModels.value[0]
-    if (first) {
-      const nowTs = Date.now()
-      sessions.value = [{
-        id: 's-' + nowTs,
-        title: '未命名会话',
-        timestamp: nowTs,
-        unread: false,
-        model: first.model,
-        messages: []
-      }]
-      currentSessionId.value = sessions.value[0].id
-    } else {
-      createPresetSessions()
-    }
+    createPresetSessions()
   } else {
     currentSessionId.value = sessions.value[0].id
   }
@@ -271,7 +206,7 @@ const initSpeechRecognition = () => {
       ElMessage.success('语音识别成功')
     }
     
-    recognition.value.onerror = () => {
+    recognition.value.onerror = (event: any) => {
       isRecording.value = false
       ElMessage.error('语音识别失败')
     }
@@ -302,7 +237,7 @@ const createNewSession = () => {
     messages: [{
       id: 'welcome',
       role: 'ai',
-      content: welcomeStr.value,
+      content: '老师您好！我是您的智能教学助手，可以帮您生成教案、分析成绩或预约资源。',
       timestamp: now,
       modelName: '系统'
     }],
@@ -426,24 +361,40 @@ const handleSend = async (content: string = inputContent.value) => {
   }
   currentSession.value.messages.push(aiMsg)
 
-  try {
-    const uid = localStorage.getItem('user_id') || '0'
-    const modelKey = currentSession.value.model
-    const modelToUse = modelKey.startsWith('db:') ? modelKey : undefined
-    const workflowCode = modelKey.startsWith('app:') ? modelKey.slice(4) : undefined
-    await streamCustomerServiceQA(uid, content, true, (t) => {
-      aiMsg.content += t
-      scrollToBottom()
-    }, modelToUse, undefined, workflowCode)
-    if (content.includes('教案')) {
-      aiMsg.exportable = true
+  let fullResponse = ''
+  
+  // 教师端专属模拟逻辑
+  if (content.includes('教案')) {
+    fullResponse = `### Python 课程教案框架\n\n**一、教学目标**\n1. 理解 Python 基础语法\n2. 掌握变量与数据类型\n\n**二、教学重难点**\n- 重点：变量定义\n- 难点：动态类型理解\n\n**三、教学过程**\n1. 导入 (5分钟)\n2. 讲解 (20分钟)\n3. 练习 (15分钟)\n\n**四、作业布置**\n完成课后习题 1-5`
+    aiMsg.exportable = true
+  } else if (content.includes('成绩') || content.includes('分析')) {
+    fullResponse = `已分析上传的成绩表格：\n- **平均分**：82.5\n- **及格率**：93%\n- **最高分**：98 (李四)\n\n建议关注不及格学生，安排辅导。`
+    aiMsg.chartData = {
+      categories: ['60分以下', '60-70', '70-80', '80-90', '90以上'],
+      data: [3, 8, 18, 15, 6]
     }
-  } catch (e) {
-    ElMessage.error('AI服务不可用')
-  } finally {
-    aiMsg.isStreaming = false
-    loading.value = false
+  } else if (content.includes('预约') || content.includes('资源')) {
+    fullResponse = `为您找到以下可用资源：\n1. **第一计算机实验室** (周三 14:00-16:00)\n2. **多媒体教室 302** (周三 14:00-16:00)\n\n您可以点击下方按钮一键预约。`
+    aiMsg.reservationLink = '第一计算机实验室'
+  } else {
+    fullResponse = `(由 ${modelName} 生成) 收到您的问题：“${content}”。\n正在为您查找相关教学资料...`
   }
+
+  const chars = fullResponse.split('')
+  let index = 0
+  const speed = 30
+
+  const streamInterval = setInterval(() => {
+    if (index < chars.length) {
+      aiMsg.content += chars[index]
+      index++
+      scrollToBottom()
+    } else {
+      clearInterval(streamInterval)
+      aiMsg.isStreaming = false
+      loading.value = false
+    }
+  }, speed) 
 }
 
 const toggleRecording = () => {
@@ -506,11 +457,12 @@ const regenerateMsg = (msg: ChatMessage) => {
 
 // 教师专属操作
 const exportLessonPlan = () => {
-  const loadingService = ElLoading.service({
-    text: '正在导出教案...'
+  const loadingMsg = ElMessage.loading({
+    message: '正在导出教案...',
+    duration: 0
   })
   setTimeout(() => {
-    loadingService.close()
+    loadingMsg.close()
     ElMessage.success('教案导出成功 (模拟下载 lesson_plan.docx)')
   }, 1000)
 }
@@ -754,7 +706,7 @@ const currentModelName = computed(() => {
               <textarea 
                 v-model="inputContent"
                 class="custom-input"
-                :placeholder="inputPlaceholder"
+                placeholder="输入您的问题，支持语音、文件辅助说明..."
                 @keydown.enter.prevent="handleSend()"
               ></textarea>
               
@@ -790,10 +742,10 @@ const currentModelName = computed(() => {
 :deep(.markdown-body) {
   font-size: 14px;
   line-height: 1.6;
-  color: var(--el-text-color-regular);
+  color: #333;
 }
 :deep(.markdown-body pre) {
-  background: rgba(255, 255, 255, 0.06);
+  background: #f5f5f5;
   padding: 10px;
   border-radius: 6px;
   overflow-x: auto;
@@ -808,11 +760,11 @@ const currentModelName = computed(() => {
   margin: 10px 0;
 }
 :deep(.markdown-body th), :deep(.markdown-body td) {
-  border: 1px solid var(--border-color);
+  border: 1px solid #ddd;
   padding: 6px 10px;
 }
 :deep(.markdown-body a) {
-  color: var(--primary-color);
+  color: #52C41A;
   text-decoration: none;
 }
 
@@ -860,19 +812,18 @@ const currentModelName = computed(() => {
 .chat-modal {
   width: 1000px;
   height: 800px;
-  background: var(--card-bg);
+  background: #fff;
   border-radius: 12px;
   display: flex;
   overflow: hidden;
-  border: 1px solid var(--border-color);
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
 }
 
 /* 左侧边栏 */
 .sidebar {
   width: 280px;
-  background: var(--card-bg);
-  border-right: 1px solid var(--border-color);
+  background: #f7f8fa;
+  border-right: 1px solid #eef0f3;
   display: flex;
   flex-direction: column;
 }
@@ -886,7 +837,7 @@ const currentModelName = computed(() => {
 .app-name {
   font-size: 18px;
   font-weight: bold;
-  color: var(--el-text-color-primary);
+  color: #333;
 }
 .new-chat-btn {
   border-radius: 16px;
@@ -913,11 +864,11 @@ const currentModelName = computed(() => {
   position: relative;
 }
 .session-card:hover {
-  background: rgba(255, 255, 255, 0.06);
+  background: #eef0f3;
   box-shadow: 0 2px 8px rgba(0,0,0,0.05);
 }
 .session-card.active {
-  background: rgba(255, 255, 255, 0.08);
+  background: #F0F9EB; /* 教师端浅绿 */
 }
 .session-title-row {
   display: flex;
@@ -926,7 +877,7 @@ const currentModelName = computed(() => {
 }
 .session-title {
   font-size: 14px;
-  color: var(--el-text-color-primary);
+  color: #333;
   font-weight: 500;
   white-space: nowrap;
   overflow: hidden;
@@ -939,7 +890,7 @@ const currentModelName = computed(() => {
 }
 .session-preview {
   font-size: 12px;
-  color: var(--el-text-color-secondary);
+  color: #666;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -956,7 +907,7 @@ const currentModelName = computed(() => {
 
 .sidebar-footer {
   padding: 15px;
-  border-top: 1px solid var(--border-color);
+  border-top: 1px solid #eef0f3;
   text-align: center;
 }
 
@@ -965,12 +916,12 @@ const currentModelName = computed(() => {
   flex: 1;
   display: flex;
   flex-direction: column;
-  background: var(--card-bg);
+  background: #fff;
 }
 
 .chat-header {
   height: 60px;
-  border-bottom: 1px solid var(--border-color);
+  border-bottom: 1px solid #f0f0f0;
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -997,7 +948,7 @@ const currentModelName = computed(() => {
 }
 .model-select {
   cursor: pointer;
-  color: var(--el-text-color-regular);
+  color: #606266;
   display: flex;
   align-items: center;
   gap: 4px;
@@ -1007,16 +958,16 @@ const currentModelName = computed(() => {
 .more-btn, .close-btn {
   font-size: 20px;
   cursor: pointer;
-  color: var(--el-text-color-secondary);
+  color: #909399;
 }
-.more-btn:hover, .close-btn:hover { color: var(--el-text-color-primary); }
+.more-btn:hover, .close-btn:hover { color: #333; }
 
 /* 消息区 */
 .messages-area {
   flex: 1;
   overflow-y: auto;
   padding: 20px;
-  background: transparent;
+  background: #FAFAFA;
   display: flex;
   flex-direction: column;
   gap: 20px;
@@ -1044,7 +995,7 @@ const currentModelName = computed(() => {
   justify-content: center;
   flex-shrink: 0;
 }
-.ai .avatar { background: rgba(255, 255, 255, 0.06); color: var(--primary-color); border: 1px solid var(--border-color); }
+.ai .avatar { background: #fff; color: #52C41A; border: 1px solid #e0e0e0; }
 .user-avatar { background: #52C41A; color: #fff; font-size: 12px; }
 
 .message-content-wrapper {
@@ -1062,9 +1013,8 @@ const currentModelName = computed(() => {
   box-shadow: 0 1px 2px rgba(0,0,0,0.05);
 }
 .ai .bubble { 
-  background: rgba(255, 255, 255, 0.06);
-  color: var(--el-text-color-primary);
-  border: 1px solid var(--border-color);
+  background: #fff; 
+  color: #333;
   border-top-left-radius: 2px;
 }
 .user .bubble { 
@@ -1126,8 +1076,8 @@ const currentModelName = computed(() => {
 /* 输入区 */
 .input-area {
   padding: 20px;
-  background: var(--card-bg);
-  border-top: 1px solid var(--border-color);
+  background: #fff;
+  border-top: 1px solid #f0f0f0;
 }
 
 .scene-shortcuts {
@@ -1148,14 +1098,14 @@ const currentModelName = computed(() => {
 }
 
 .input-box {
-  border: 1px solid var(--border-color);
+  border: 1px solid #dcdfe6;
   border-radius: 24px;
   padding: 10px 15px;
   display: flex;
   align-items: flex-end;
   gap: 10px;
   transition: all 0.2s;
-  background: rgba(255, 255, 255, 0.04);
+  background: #fff;
 }
 .input-box:focus-within {
   border-color: #52C41A;
@@ -1169,7 +1119,7 @@ const currentModelName = computed(() => {
 }
 .tool-icon {
   font-size: 20px;
-  color: var(--el-text-color-secondary);
+  color: #909399;
   cursor: pointer;
   transition: color 0.2s;
 }
@@ -1185,10 +1135,9 @@ const currentModelName = computed(() => {
   padding: 8px 0;
   font-size: 14px;
   line-height: 1.5;
-  color: var(--el-text-color-primary);
-  background: transparent;
+  color: #333;
 }
-.custom-input::placeholder { color: var(--el-text-color-secondary); }
+.custom-input::placeholder { color: #C0C4CC; }
 
 .send-btn {
   border-radius: 20px;
