@@ -13,7 +13,7 @@ interface StudentScore {
   studentId: string
   name: string
   className: string
-  usualScore: number | null      // 平时成绩
+  usualScore: number | null      // 平均成绩（期中+期末）
   midtermScore: number | null    // 期中成绩
   finalScore: number | null      // 期末成绩
   totalScore: number | null      // 总评成绩
@@ -43,14 +43,16 @@ const generateStudents = (): StudentScore[] => {
   const students: StudentScore[] = []
   for (let i = 1; i <= 30; i++) {
     const hasScore = i <= 20 // 前20个学生已有成绩
+    const midterm = hasScore ? Math.floor(Math.random() * 20 + 70) : null
+    const final = hasScore ? Math.floor(Math.random() * 20 + 70) : null
     students.push({
       id: i,
       studentId: `2023${String(i).padStart(4, '0')}`,
       name: `学生${i}`,
       className: `计算机${(i % 3) + 1}班`,
-      usualScore: hasScore ? Math.floor(Math.random() * 20 + 70) : null,
-      midtermScore: hasScore ? Math.floor(Math.random() * 20 + 70) : null,
-      finalScore: hasScore ? Math.floor(Math.random() * 20 + 70) : null,
+      usualScore: null,
+      midtermScore: midterm,
+      finalScore: final,
       totalScore: null,
       gpa: null
     })
@@ -74,9 +76,14 @@ let chartInstance: echarts.ECharts | null = null
 
 /**
  * 计算总评成绩
- * 公式：总评 = 平时30% + 期中30% + 期末40%
+ * 公式：总评 = 平均30% + 期中30% + 期末40%
  */
 const calculateTotalScore = (student: StudentScore) => {
+  if (student.midtermScore !== null && student.finalScore !== null) {
+    student.usualScore = Math.round((student.midtermScore + student.finalScore) / 2)
+  } else {
+    student.usualScore = null
+  }
   if (student.usualScore !== null && student.midtermScore !== null && student.finalScore !== null) {
     student.totalScore = Math.round(
       student.usualScore * 0.3 + student.midtermScore * 0.3 + student.finalScore * 0.4
@@ -136,7 +143,7 @@ const scoreDistribution = computed(() => {
 })
 
 // 单元格编辑
-const handleCellEdit = (row: StudentScore, field: 'usualScore' | 'midtermScore' | 'finalScore', value: number) => {
+const handleCellEdit = (row: StudentScore, field: 'midtermScore' | 'finalScore', value: number | null) => {
   row[field] = value
   calculateTotalScore(row)
   hasUnsavedChanges.value = true
@@ -145,6 +152,9 @@ const handleCellEdit = (row: StudentScore, field: 'usualScore' | 'midtermScore' 
 // 打开编辑弹窗
 const openEditDialog = (student: StudentScore) => {
   currentStudent.value = { ...student }
+  if (currentStudent.value) {
+    calculateTotalScore(currentStudent.value)
+  }
   editDialogVisible.value = true
 }
 
@@ -167,8 +177,7 @@ const handleImport = () => {
   ElMessage.success('模拟导入成功！已导入30条成绩记录')
   // 模拟填充所有学生成绩
   studentScores.value.forEach(student => {
-    if (student.usualScore === null) {
-      student.usualScore = Math.floor(Math.random() * 20 + 70)
+    if (student.midtermScore === null && student.finalScore === null) {
       student.midtermScore = Math.floor(Math.random() * 20 + 70)
       student.finalScore = Math.floor(Math.random() * 20 + 70)
       calculateTotalScore(student)
@@ -261,6 +270,7 @@ const loadLocalData = () => {
   if (saved) {
     studentScores.value = JSON.parse(saved)
   }
+  studentScores.value.forEach((student) => calculateTotalScore(student))
 }
 
 loadLocalData()
@@ -269,6 +279,15 @@ loadLocalData()
 nextTick(() => {
   initChart()
 })
+
+watch(
+  () => [currentStudent.value?.midtermScore, currentStudent.value?.finalScore],
+  () => {
+    if (currentStudent.value) {
+      calculateTotalScore(currentStudent.value)
+    }
+  }
+)
 
 // 监听成绩变化，动态刷新图表
 watch(studentScores, () => {
@@ -368,16 +387,9 @@ watch(studentScores, () => {
         <el-table-column prop="studentId" label="学号" width="120" fixed />
         <el-table-column prop="name" label="姓名" width="100" fixed />
         <el-table-column prop="className" label="班级" width="120" />
-        <el-table-column label="平时成绩" width="120" align="center">
+        <el-table-column label="平均成绩" width="120" align="center">
           <template #default="{ row }">
-            <el-input-number
-              v-model="row.usualScore"
-              :min="0"
-              :max="100"
-              :precision="0"
-              size="small"
-              @change="handleCellEdit(row, 'usualScore', row.usualScore)"
-            />
+            <span class="avg-score">{{ row.usualScore ?? '-' }}</span>
           </template>
         </el-table-column>
         <el-table-column label="期中成绩" width="120" align="center">
@@ -433,8 +445,8 @@ watch(studentScores, () => {
         <el-form-item label="班级">
           <el-input v-model="currentStudent.className" disabled />
         </el-form-item>
-        <el-form-item label="平时成绩">
-          <el-input-number v-model="currentStudent.usualScore" :min="0" :max="100" style="width: 100%" />
+        <el-form-item label="平均成绩">
+          <el-input-number v-model="currentStudent.usualScore" disabled style="width: 100%" />
         </el-form-item>
         <el-form-item label="期中成绩">
           <el-input-number v-model="currentStudent.midtermScore" :min="0" :max="100" style="width: 100%" />
@@ -443,7 +455,7 @@ watch(studentScores, () => {
           <el-input-number v-model="currentStudent.finalScore" :min="0" :max="100" style="width: 100%" />
         </el-form-item>
         <el-alert 
-          title="总评成绩计算公式：平时30% + 期中30% + 期末40%" 
+          title="平均成绩自动计算：期中与期末平均值" 
           type="info" 
           :closable="false"
           style="margin-bottom: 15px"
@@ -475,6 +487,10 @@ watch(studentScores, () => {
 .right-section {
   display: flex;
   gap: 10px;
+}
+.avg-score {
+  font-weight: 600;
+  color: var(--primary-color);
 }
 .statistics-section {
   flex-shrink: 0;

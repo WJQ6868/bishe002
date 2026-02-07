@@ -27,6 +27,10 @@ class QwenClient:
         dashscope.api_key = self.api_key
         # Sensitive words list (Mock)
         self.sensitive_words = ["暴力", "色情", "赌博"] 
+    
+    def _disable_redis(self):
+        global redis_client
+        redis_client = None
 
     def _check_sensitive(self, text: str) -> bool:
         words = jieba.lcut(text)
@@ -46,22 +50,34 @@ class QwenClient:
         if not redis_client:
             return None
         key = self._get_cache_key(question)
-        return redis_client.get(key)
+        try:
+            return redis_client.get(key)
+        except Exception:
+            # Redis unavailable; disable cache to avoid crashing stream
+            self._disable_redis()
+            return None
 
     def cache_answer(self, question: str, answer: str):
         if not redis_client:
             return
         key = self._get_cache_key(question)
-        redis_client.setex(key, 3600, answer) # 1 hour
+        try:
+            redis_client.setex(key, 3600, answer) # 1 hour
+        except Exception:
+            self._disable_redis()
 
     def get_history(self, user_id: str) -> List[Dict]:
         if not redis_client:
             return []
         key = self._get_history_key(user_id)
-        history_json = redis_client.get(key)
-        if history_json:
-            return json.loads(history_json)
-        return []
+        try:
+            history_json = redis_client.get(key)
+            if history_json:
+                return json.loads(history_json)
+            return []
+        except Exception:
+            self._disable_redis()
+            return []
 
     def update_history(self, user_id: str, question: str, answer: str):
         if not redis_client:
@@ -73,7 +89,10 @@ class QwenClient:
         # Keep last 10 rounds to avoid token limit
         if len(history) > 20:
             history = history[-20:]
-        redis_client.setex(key, 86400, json.dumps(history)) # 24 hours
+        try:
+            redis_client.setex(key, 86400, json.dumps(history)) # 24 hours
+        except Exception:
+            self._disable_redis()
 
     @retry(stop=stop_after_attempt(2), wait=wait_fixed(1))
     def call_stream_api(self, user_id: str, question: str, history_flag: bool) -> Generator[str, None, None]:

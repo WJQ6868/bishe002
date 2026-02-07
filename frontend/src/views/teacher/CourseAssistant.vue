@@ -3,13 +3,15 @@ import { computed, onMounted, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Search } from '@element-plus/icons-vue'
 import { streamQA } from '@/api/ai'
-import { aiPortalApi, type TeacherCourse, type AiWorkflowApp } from '@/api/aiPortal'
+import { aiPortalApi, type TeacherCourse, type AiWorkflowApp, type PublicAiModelApi } from '@/api/aiPortal'
 
 const loading = ref(false)
 const asking = ref(false)
 
 const courses = ref<TeacherCourse[]>([])
 const selectedCourseId = ref<number | null>(null)
+const selectedModel = ref<string>('')
+const modelOptions = ref<{ label: string; value: string }[]>([])
 
 // 管理员提供的基础工作流（仅用于复制）
 const baseWorkflows = ref<AiWorkflowApp[]>([])
@@ -62,6 +64,19 @@ const loadInit = async () => {
       if (teacherWorkflows.value.length) chatWorkflow.value = teacherWorkflows.value[0].code
       else if (baseWorkflows.value.length) chatWorkflow.value = baseWorkflows.value[0].code
     }
+    try {
+      const models = await aiPortalApi.listPublicModelApis()
+      modelOptions.value = (models || []).map((m: PublicAiModelApi) => ({
+        label: `${m.name}（${m.model_name}）`,
+        value: `db:${m.id}`
+      }))
+      if (!selectedModel.value) {
+        selectedModel.value = modelOptions.value[0]?.value || ''
+      }
+    } catch {
+      modelOptions.value = [{ label: '系统默认模型', value: '' }]
+      selectedModel.value = ''
+    }
   } catch (err) {
     console.error(err)
     courses.value = []
@@ -98,7 +113,7 @@ const handleAsk = async () => {
       buildPrompt(),
       false,
       (chunk) => { result.value += chunk },
-      undefined,
+      selectedModel.value || undefined,
       selectedCourseId.value || undefined,
       workflowCode,
     )
@@ -224,6 +239,7 @@ onMounted(loadInit)
       <div class="item">我的课程数：{{ courses.length }}</div>
       <div class="item">当前课程：{{ courseName || '未选择' }}</div>
       <div class="item">知识库策略：教师KB → 基础KB</div>
+      <div class="item">当前模型：{{ modelOptions.find(m => m.value === selectedModel)?.label || '系统默认' }}</div>
       <div class="item">响应：流式输出</div>
     </div>
 
@@ -267,6 +283,15 @@ onMounted(loadInit)
             :disabled="loading || !chatOptions.length"
           >
             <el-option v-for="opt in chatOptions" :key="opt.value" :label="opt.label" :value="opt.value" />
+          </el-select>
+          <span class="label">模型</span>
+          <el-select
+            v-model="selectedModel"
+            placeholder="选择调用模型"
+            style="width: 260px"
+            :disabled="loading"
+          >
+            <el-option v-for="m in modelOptions" :key="m.value || 'default'" :label="m.label" :value="m.value" />
           </el-select>
         </div>
 
