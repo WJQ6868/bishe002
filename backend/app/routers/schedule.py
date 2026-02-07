@@ -15,7 +15,7 @@ from ..models.schedule import Classroom, Schedule
 from ..models.course import Course, Teacher
 from ..models.teaching import WorkSchedule, WorkType
 from ..models.user import User
-import time
+import time as pytime
 
 router = APIRouter(prefix="/schedule", tags=["Schedule Management"])
 
@@ -57,7 +57,7 @@ async def generate_schedule(
     request: ScheduleRequest,
     current_user=Depends(get_current_admin),
 ):
-    start_time = time.time()
+    start_time = pytime.time()
     
     ga = GeneticSchedule(request.teachers, request.courses, request.classrooms)
     best_schedule, stats = ga.evolve()
@@ -68,7 +68,7 @@ async def generate_schedule(
     formatted_schedule = ga.format_result(best_schedule)
     entries = ga.schedule_to_entries(best_schedule)
     
-    end_time = time.time()
+    end_time = pytime.time()
     print(f"Scheduling took {end_time - start_time:.2f} seconds")
     
     return ScheduleResponse(
