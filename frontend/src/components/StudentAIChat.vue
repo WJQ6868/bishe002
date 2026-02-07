@@ -3,13 +3,14 @@ import { ref, reactive, onMounted, nextTick, computed, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { 
   ChatRound, Plus, Delete, Edit, MoreFilled, 
-  Microphone, FolderAdd, Picture, Document, 
-  CopyDocument, RefreshRight, Back, Close,
-  ArrowDown, Timer, Monitor, Cpu, ChatDotRound
+  Microphone, FolderAdd, Picture,
+  RefreshRight, Close, ChatDotRound
 } from '@element-plus/icons-vue'
 import { marked } from 'marked'
 import hljs from 'highlight.js'
 import 'highlight.js/styles/github.css'
+import { streamQA } from '@/api/ai'
+import { aiPortalApi, type CustomerServiceConfig } from '@/api/aiPortal'
 
 // 配置 marked
 marked.setOptions({
@@ -39,14 +40,6 @@ interface Session {
   messages: ChatMessage[]
   timestamp: number
   unread: boolean
-  model: string // 当前会话使用的模型
-}
-
-interface ModelAuth {
-  model: string
-  name: string
-  isConfigured: boolean
-  studentAuth: boolean
 }
 
 // --- 2. 状态管理 ---
@@ -62,18 +55,25 @@ const sessions = ref<Session[]>([])
 const currentSessionId = ref('')
 const currentSession = computed(() => sessions.value.find(s => s.id === currentSessionId.value))
 
-// 模型相关
-const availableModels = ref<ModelAuth[]>([])
-const allowUserSwitchModel = ref(true)
-const keepSessionOnSwitch = ref(true)
+const appTitle = 'AI客服'
+
+const defaultCustomerConfig: CustomerServiceConfig = {
+  welcome_str: '你好，我是AI客服，可以帮你解答校园常见问题。',
+  recommend_questions: ['如何请假？', '如何选课？', '成绩在哪里查询？'],
+  search_placeholder: '请输入问题，例如：如何请假？'
+}
+
+const customerConfig = reactive({
+  welcome_str: defaultCustomerConfig.welcome_str,
+  recommend_questions: [...defaultCustomerConfig.recommend_questions],
+  search_placeholder: defaultCustomerConfig.search_placeholder
+})
+
+const customerWorkflow = ref('')
 
 // 快捷提问
-const quickQuestions = [
-  '如何退课？',
-  '绩点计算规则？',
-  '选课冲突怎么办？',
-  '奖学金申请条件？'
-]
+const quickQuestions = ref<string[]>([...defaultCustomerConfig.recommend_questions])
+const inputPlaceholder = computed(() => customerConfig.search_placeholder || defaultCustomerConfig.search_placeholder)
 
 // 管理员配置
 const aiConfig = reactive({
@@ -87,34 +87,37 @@ const aiConfig = reactive({
 // --- 3. 核心逻辑 ---
 
 onMounted(() => {
-  initData()
+  void initData()
   initSpeechRecognition()
 })
 
-const initData = () => {
-  // 1. 读取配置
-  const savedConfig = localStorage.getItem('ai_chat_config')
-  if (savedConfig) {
-    const config = JSON.parse(savedConfig)
-    aiConfig.enableStream = config.functions?.enableStream ?? true
-    aiConfig.enableVoiceInput = config.functions?.enableVoiceInput ?? true
-    aiConfig.enableFileUpload = config.functions?.enableFileUpload ?? false
-    aiConfig.allowedFileTypes = config.functions?.allowedFileTypes || ['doc', 'pdf', 'image', 'excel']
-    aiConfig.recallTimeLimit = config.functions?.recallTimeLimit || 5
-    
-    if (config.modelAuths) {
-      availableModels.value = config.modelAuths.filter((m: ModelAuth) => m.studentAuth && m.isConfigured)
+const loadCustomerService = async () => {
+  try {
+    const [config, apps] = await Promise.all([
+      aiPortalApi.getCustomerServiceConfig(),
+      aiPortalApi.listCustomerServiceApps()
+    ])
+    if (config) {
+      customerConfig.welcome_str = config.welcome_str || defaultCustomerConfig.welcome_str
+      customerConfig.search_placeholder = config.search_placeholder || defaultCustomerConfig.search_placeholder
+      customerConfig.recommend_questions = (config.recommend_questions && config.recommend_questions.length)
+        ? config.recommend_questions
+        : [...defaultCustomerConfig.recommend_questions]
+      quickQuestions.value = [...customerConfig.recommend_questions]
     }
-    if (config.functions) {
-      allowUserSwitchModel.value = config.functions.allowUserSwitchModel
-      keepSessionOnSwitch.value = config.functions.keepSessionOnSwitch
-    }
-  } else {
-    // 默认兜底
-    availableModels.value = [{ model: 'tongyi', name: '通义千问', isConfigured: true, studentAuth: true }]
+    const enabledApps = (apps || []).filter(a => a.status === 'enabled')
+    customerWorkflow.value = enabledApps[0]?.code || 'customer_service'
+  } catch (err) {
+    console.error(err)
+    quickQuestions.value = [...customerConfig.recommend_questions]
+    if (!customerWorkflow.value) customerWorkflow.value = 'customer_service'
   }
+}
 
-  // 2. 读取会话历史
+const initData = async () => {
+  await loadCustomerService()
+
+  // 读取会话历史
   const savedSessions = localStorage.getItem('student_ai_sessions')
   if (savedSessions) {
     sessions.value = JSON.parse(savedSessions)
@@ -122,41 +125,10 @@ const initData = () => {
   
   // 如果没有会话，创建默认会话
   if (sessions.value.length === 0) {
-    // 预设历史会话
-    createPresetSessions()
+    createNewSession()
   } else {
     currentSessionId.value = sessions.value[0].id
   }
-}
-
-const createPresetSessions = () => {
-  const now = Date.now()
-  const preset: Session[] = [
-    {
-      id: '1',
-      title: '选课咨询',
-      timestamp: now,
-      unread: false,
-      model: 'tongyi',
-      messages: [
-        { id: '1-1', role: 'user', content: '选课时间是什么时候？', timestamp: now - 100000, operable: true },
-        { id: '1-2', role: 'ai', content: '本学期选课时间为 **9月1日 08:00 - 9月5日 18:00**，请登录教务系统及时选课。', timestamp: now - 90000, modelName: '通义千问' }
-      ]
-    },
-    {
-      id: '2',
-      title: '成绩查询',
-      timestamp: now - 86400000,
-      unread: true,
-      model: 'tongyi',
-      messages: [
-        { id: '2-1', role: 'user', content: '怎么查上学期的成绩？', timestamp: now - 86500000, operable: true },
-        { id: '2-2', role: 'ai', content: '进入“成绩管理”模块，选择“学期成绩”，即可查看历史学期成绩单。', timestamp: now - 86400000, modelName: '通义千问' }
-      ]
-    }
-  ]
-  sessions.value = preset
-  currentSessionId.value = '1'
 }
 
 // 语音识别初始化
@@ -211,13 +183,12 @@ const createNewSession = () => {
     messages: [{
       id: 'welcome',
       role: 'ai',
-      content: '同学你好！我是你的智能教务助手，有什么可以帮你的吗？',
+      content: customerConfig.welcome_str || defaultCustomerConfig.welcome_str,
       timestamp: now,
       modelName: '系统'
     }],
     timestamp: now,
-    unread: false,
-    model: availableModels.value[0]?.model || 'tongyi'
+    unread: false
   }
   sessions.value.unshift(newSession)
   currentSessionId.value = newSession.id
@@ -278,51 +249,25 @@ const switchSession = (id: string) => {
   scrollToBottom()
 }
 
-// 切换模型
-const handleModelSwitch = (modelKey: string) => {
-  if (!currentSession.value || currentSession.value.model === modelKey) return
-  
-  const targetModelName = availableModels.value.find(m => m.model === modelKey)?.name || modelKey
-  
-  if (!keepSessionOnSwitch.value) {
-    // 清空当前会话消息
-    currentSession.value.messages = [{
-      id: Date.now().toString(),
-      role: 'ai',
-      content: `已切换至【${targetModelName}】模型，会话已重置。`,
-      timestamp: Date.now(),
-      modelName: '系统'
-    }]
-  } else {
-    currentSession.value.messages.push({
-      id: Date.now().toString(),
-      role: 'ai',
-      content: `已切换至【${targetModelName}】模型，继续为您解答~`,
-      timestamp: Date.now(),
-      modelName: '系统'
-    })
-  }
-  currentSession.value.model = modelKey
-  scrollToBottom()
-}
-
 // 发送消息
 const handleSend = async (content: string = inputContent.value) => {
   if (!content.trim() || !currentSession.value) return
 
-  // 1. 添加用户消息
+  const question = content.trim()
+
+  // 1. ??????
   const userMsg: ChatMessage = {
     id: Date.now().toString(),
     role: 'user',
-    content: content,
+    content: question,
     timestamp: Date.now(),
     operable: true
   }
   currentSession.value.messages.push(userMsg)
   
-  // 自动生成标题 (如果是第一条用户消息)
-  if (currentSession.value.messages.length <= 2 && currentSession.value.title.startsWith('未命名')) {
-    currentSession.value.title = content.substring(0, 10) + (content.length > 10 ? '...' : '')
+  // ?????? (??????????)
+  if (currentSession.value.messages.length <= 2 && currentSession.value.title.startsWith('???')) {
+    currentSession.value.title = question.substring(0, 10) + (question.length > 10 ? '...' : '')
   }
   currentSession.value.timestamp = Date.now()
 
@@ -330,54 +275,50 @@ const handleSend = async (content: string = inputContent.value) => {
   scrollToBottom()
   loading.value = true
 
-  // 2. 模拟 AI 响应
-  const aiMsgId = (Date.now() + 1).toString()
-  const modelKey = currentSession.value.model
-  const modelName = availableModels.value.find(m => m.model === modelKey)?.name || 'AI'
-  
   const aiMsg: ChatMessage = {
-    id: aiMsgId,
+    id: (Date.now() + 1).toString(),
     role: 'ai',
     content: '',
     timestamp: Date.now(),
     isStreaming: true,
-    modelName: modelName
+    modelName: appTitle
   }
   currentSession.value.messages.push(aiMsg)
 
-  // 模拟响应内容
-  let fullResponse = ''
-  
-  // 简单的关键词匹配逻辑
-  if (content.includes('退课')) {
-    fullResponse = `### 退课流程说明\n\n1. 登录教务系统\n2. 进入 **选课管理** -> **我的课程**\n3. 找到对应课程，点击“退课”按钮\n\n> 注意：退课需在开学后两周内完成，逾期将无法退课。`
-  } else if (content.includes('绩点')) {
-    fullResponse = `### 绩点计算规则\n\n平均学分绩点 (GPA) 计算公式：\n\n$$ GPA = \\frac{\\sum(课程绩点 \\times 学分)}{\\sum 学分} $$\n\n**绩点对照表**：\n| 分数 | 绩点 |\n|---|---|\n| 90-100 | 4.0 |\n| 85-89 | 3.7 |\n| 82-84 | 3.3 |`
-  } else if (content.includes('代码') || content.includes('python')) {
-    fullResponse = `好的，这是一个 Python 成绩统计的示例代码：\n\n\`\`\`python\ndef calculate_average(scores):\n    if not scores:\n        return 0\n    return sum(scores) / len(scores)\n\nscores = [85, 92, 78, 90]\nprint(f"平均分: {calculate_average(scores)}")\n\`\`\``
-  } else {
-    fullResponse = `(由 ${modelName} 生成) 收到您的问题：“${content}”。\n正在为您查询相关教务规定...`
+  const workflowCode = customerWorkflow.value || 'customer_service'
+  if (!workflowCode) {
+    aiMsg.content = 'AI???????????????'
+    aiMsg.isStreaming = false
+    loading.value = false
+    return
   }
 
-  // 流式模拟
-  const chars = fullResponse.split('')
-  let index = 0
-  const speed = 30
-
-  const streamInterval = setInterval(() => {
-    if (index < chars.length) {
-      aiMsg.content += chars[index]
-      index++
-      scrollToBottom()
-    } else {
-      clearInterval(streamInterval)
-      aiMsg.isStreaming = false
-      loading.value = false
+  try {
+    await streamQA(
+      localStorage.getItem('user_id') || '0',
+      question,
+      false,
+      (chunk) => {
+        aiMsg.content += chunk
+        scrollToBottom()
+      },
+      undefined,
+      undefined,
+      workflowCode
+    )
+  } catch (err) {
+    console.error(err)
+    if (!aiMsg.content) {
+      aiMsg.content = 'AI?????????????????'
     }
-  }, speed) 
+    ElMessage.error('AI??????????')
+  } finally {
+    aiMsg.isStreaming = false
+    loading.value = false
+    scrollToBottom()
+  }
 }
 
-// 语音输入
 const toggleRecording = () => {
   if (!recognition.value) {
     ElMessage.warning('当前浏览器不支持语音输入，请使用 Chrome')
@@ -472,19 +413,14 @@ const useQuickQuestion = (text: string) => {
   handleSend(text)
 }
 
-const currentModelName = computed(() => {
-  if (!currentSession.value) return ''
-  return availableModels.value.find(m => m.model === currentSession.value?.model)?.name || 'AI'
-})
-
 </script>
 
 <template>
-  <div>
+  <div class="student-ai-chat">
     <!-- 悬浮触发按钮 -->
     <div class="float-trigger" @click="toggleChat" v-if="!isVisible">
       <el-icon :size="28"><ChatRound /></el-icon>
-      <span class="trigger-text">AI助手</span>
+      <span class="trigger-text">{{ appTitle }}</span>
     </div>
 
     <!-- 聊天主窗口 (Modal) -->
@@ -494,7 +430,7 @@ const currentModelName = computed(() => {
         <!-- 左侧会话列表 -->
         <div class="sidebar">
           <div class="sidebar-header">
-            <span class="app-name">AI 助手</span>
+            <span class="app-name">{{ appTitle }}</span>
             <el-button type="primary" size="small" :icon="Plus" class="new-chat-btn" @click="createNewSession">
               新建会话
             </el-button>
@@ -537,27 +473,6 @@ const currentModelName = computed(() => {
             </div>
             
             <div class="header-right">
-              <!-- 模型选择 -->
-              <el-dropdown trigger="click" @command="handleModelSwitch" v-if="allowUserSwitchModel">
-                <span class="model-select">
-                  <el-icon><Cpu /></el-icon>
-                  {{ currentModelName }}
-                  <el-icon class="el-icon--right"><ArrowDown /></el-icon>
-                </span>
-                <template #dropdown>
-                  <el-dropdown-menu>
-                    <el-dropdown-item 
-                      v-for="m in availableModels" 
-                      :key="m.model" 
-                      :command="m.model"
-                      :disabled="currentSession?.model === m.model"
-                    >
-                      {{ m.name }}
-                    </el-dropdown-item>
-                  </el-dropdown-menu>
-                </template>
-              </el-dropdown>
-
               <el-dropdown trigger="click">
                 <el-icon class="more-btn"><MoreFilled /></el-icon>
                 <template #dropdown>
@@ -635,7 +550,7 @@ const currentModelName = computed(() => {
               <textarea 
                 v-model="inputContent"
                 class="custom-input"
-                placeholder="输入您的问题，支持语音、文件辅助说明..."
+                :placeholder="inputPlaceholder"
                 @keydown.enter.prevent="handleSend()"
               ></textarea>
               
@@ -713,6 +628,20 @@ const currentModelName = computed(() => {
   margin-top: 2px;
 }
 
+/* 统一学生端 AI 助手面板底色 */
+.student-ai-chat {
+  --ai-chat-bg: #2b2f36;
+  --ai-chat-sidebar-bg: #24272e;
+  --ai-chat-main-bg: #2b2f36;
+  --ai-chat-messages-bg: #30343c;
+  --ai-chat-input-bg: #262a31;
+  --ai-chat-text: #e6e8eb;
+  --ai-chat-text-muted: #aeb4be;
+  --ai-chat-border: #3a3f46;
+  --ai-chat-hover: #343a42;
+  --ai-chat-active: #3a4452;
+}
+
 /* 模态框 */
 .chat-modal-overlay {
   position: fixed;
@@ -730,7 +659,8 @@ const currentModelName = computed(() => {
 .chat-modal {
   width: 1000px;
   height: 800px;
-  background: #fff;
+  background: var(--ai-chat-bg, #f7fbff) !important;
+  color: var(--ai-chat-text, #303133) !important;
   border-radius: 12px;
   display: flex;
   overflow: hidden;
@@ -740,8 +670,9 @@ const currentModelName = computed(() => {
 /* 左侧边栏 */
 .sidebar {
   width: 280px;
-  background: #f7f8fa;
-  border-right: 1px solid #eef0f3;
+  background: var(--ai-chat-sidebar-bg, #f1f6ff) !important;
+  color: var(--ai-chat-text, #303133) !important;
+  border-right: 1px solid var(--ai-chat-border, #3a3f46);
   display: flex;
   flex-direction: column;
 }
@@ -755,7 +686,7 @@ const currentModelName = computed(() => {
 .app-name {
   font-size: 18px;
   font-weight: bold;
-  color: #333;
+  color: var(--ai-chat-text, #e6e8eb);
 }
 .new-chat-btn {
   border-radius: 16px;
@@ -776,11 +707,11 @@ const currentModelName = computed(() => {
   position: relative;
 }
 .session-card:hover {
-  background: #eef0f3;
+  background: var(--ai-chat-hover, #343a42);
   box-shadow: 0 2px 8px rgba(0,0,0,0.05);
 }
 .session-card.active {
-  background: #E6F7FF;
+  background: var(--ai-chat-active, #3a4452);
 }
 .session-title-row {
   display: flex;
@@ -789,7 +720,7 @@ const currentModelName = computed(() => {
 }
 .session-title {
   font-size: 14px;
-  color: #333;
+  color: var(--ai-chat-text, #e6e8eb);
   font-weight: 500;
   white-space: nowrap;
   overflow: hidden;
@@ -798,11 +729,11 @@ const currentModelName = computed(() => {
 }
 .session-time {
   font-size: 12px;
-  color: #999;
+  color: var(--ai-chat-text-muted, #aeb4be);
 }
 .session-preview {
   font-size: 12px;
-  color: #666;
+  color: var(--ai-chat-text-muted, #aeb4be);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -819,7 +750,7 @@ const currentModelName = computed(() => {
 
 .sidebar-footer {
   padding: 15px;
-  border-top: 1px solid #eef0f3;
+  border-top: 1px solid var(--ai-chat-border, #3a3f46);
   text-align: center;
 }
 
@@ -828,12 +759,13 @@ const currentModelName = computed(() => {
   flex: 1;
   display: flex;
   flex-direction: column;
-  background: #fff;
+  background: var(--ai-chat-main-bg, #f7fbff) !important;
+  color: var(--ai-chat-text, #303133) !important;
 }
 
 .chat-header {
   height: 60px;
-  border-bottom: 1px solid #f0f0f0;
+  border-bottom: 1px solid var(--ai-chat-border, #3a3f46);
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -848,7 +780,7 @@ const currentModelName = computed(() => {
 }
 .edit-icon {
   cursor: pointer;
-  color: #909399;
+  color: var(--ai-chat-text-muted, #aeb4be);
   font-size: 14px;
 }
 .edit-icon:hover { color: #409EFF; }
@@ -858,28 +790,20 @@ const currentModelName = computed(() => {
   align-items: center;
   gap: 15px;
 }
-.model-select {
-  cursor: pointer;
-  color: #606266;
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  font-size: 14px;
-}
-.model-select:hover { color: #409EFF; }
 .more-btn, .close-btn {
   font-size: 20px;
   cursor: pointer;
-  color: #909399;
+  color: var(--ai-chat-text-muted, #aeb4be);
 }
-.more-btn:hover, .close-btn:hover { color: #333; }
+.more-btn:hover, .close-btn:hover { color: var(--ai-chat-text, #e6e8eb); }
 
 /* 消息区 */
 .messages-area {
   flex: 1;
   overflow-y: auto;
   padding: 20px;
-  background: #FAFAFA;
+  background: var(--ai-chat-messages-bg, #f9fcff) !important;
+  color: var(--ai-chat-text, #303133) !important;
   display: flex;
   flex-direction: column;
   gap: 20px;
@@ -892,7 +816,7 @@ const currentModelName = computed(() => {
 }
 .message-row.user {
   align-self: flex-end;
-  flex-direction: row-reverse;
+  flex-direction: row;
 }
 .message-row.ai {
   align-self: flex-start;
@@ -922,16 +846,23 @@ const currentModelName = computed(() => {
   font-size: 15px;
   line-height: 1.6;
   word-break: break-all;
-  box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.15);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid transparent;
 }
 .ai .bubble { 
-  background: #fff; 
-  color: #333;
+  background: rgba(120, 130, 140, 0.22);
+  color: #e6e8eb;
+  border-color: rgba(180, 190, 200, 0.35);
+  border-bottom-color: rgba(200, 210, 220, 0.7);
   border-top-left-radius: 2px;
 }
 .user .bubble { 
-  background: #409EFF; 
-  color: #fff;
+  background: rgba(64, 158, 255, 0.22);
+  color: #e6e8eb;
+  border-color: rgba(64, 158, 255, 0.35);
+  border-bottom-color: rgba(64, 158, 255, 0.75);
   border-top-right-radius: 2px;
 }
 
@@ -940,7 +871,7 @@ const currentModelName = computed(() => {
   align-items: center;
   gap: 10px;
   font-size: 12px;
-  color: #999;
+  color: var(--ai-chat-text-muted, #aeb4be);
   opacity: 0;
   transition: opacity 0.2s;
 }
@@ -959,14 +890,14 @@ const currentModelName = computed(() => {
 .loading-indicator {
   align-self: flex-start;
   margin-left: 50px;
-  color: #999;
+  color: var(--ai-chat-text-muted, #aeb4be);
   font-size: 13px;
 }
 .dot {
   display: inline-block;
   width: 4px;
   height: 4px;
-  background: #999;
+  background: var(--ai-chat-text-muted, #aeb4be);
   border-radius: 50%;
   margin-right: 2px;
   animation: bounce 1.4s infinite ease-in-out both;
@@ -982,7 +913,8 @@ const currentModelName = computed(() => {
 /* 输入区 */
 .input-area {
   padding: 20px;
-  background: #fff;
+  background: var(--ai-chat-input-bg, #f7fbff) !important;
+  color: var(--ai-chat-text, #303133) !important;
   border-top: 1px solid #f0f0f0;
 }
 
@@ -1000,14 +932,14 @@ const currentModelName = computed(() => {
 }
 
 .input-box {
-  border: 1px solid #dcdfe6;
+  border: 1px solid var(--ai-chat-border, #3a3f46);
   border-radius: 24px;
   padding: 10px 15px;
   display: flex;
   align-items: flex-end;
   gap: 10px;
   transition: all 0.2s;
-  background: #fff;
+  background: #1f2329;
 }
 .input-box:focus-within {
   border-color: #409EFF;
@@ -1021,7 +953,7 @@ const currentModelName = computed(() => {
 }
 .tool-icon {
   font-size: 20px;
-  color: #909399;
+  color: var(--ai-chat-text-muted, #aeb4be);
   cursor: pointer;
   transition: color 0.2s;
 }
@@ -1037,9 +969,10 @@ const currentModelName = computed(() => {
   padding: 8px 0;
   font-size: 14px;
   line-height: 1.5;
-  color: #333;
+  color: var(--ai-chat-text, #e6e8eb);
+  background: transparent;
 }
-.custom-input::placeholder { color: #C0C4CC; }
+.custom-input::placeholder { color: var(--ai-chat-text-muted, #aeb4be); }
 
 .send-btn {
   border-radius: 20px;
