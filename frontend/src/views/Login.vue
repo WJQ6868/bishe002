@@ -70,15 +70,17 @@ const rules = reactive<FormRules>({
   role: [{ required: true, message: '请选择角色', trigger: 'change' }]
 })
 
-const accountPlaceholder = computed(() => {
-  if (form.role === 'student') {
+const getAccountPlaceholder = (role: LoginForm['role']) => {
+  if (role === 'student') {
     return '学号（8位，以2开头）'
   }
-  if (form.role === 'teacher') {
+  if (role === 'teacher') {
     return '工号（6位，以1开头）'
   }
   return '工号（6位，以8开头）'
-})
+}
+
+const accountPlaceholder = computed(() => getAccountPlaceholder(form.role))
 
 const handleLogin = async (formEl: FormInstance | undefined) => {
   if (!formEl) return
@@ -142,11 +144,129 @@ const getRoleName = (role: string) => {
 const handleRoleChange = () => {
   formRef.value?.clearValidate()
 }
+
+const forgotVisible = ref(false)
+const forgotLoading = ref(false)
+const forgotFormRef = ref<FormInstance>()
+
+const forgotForm = reactive({
+  role: 'student' as LoginForm['role'],
+  account: '',
+  name: '',
+  newPassword: '',
+  confirmPassword: ''
+})
+
+const validateForgotAccount = (_rule: any, value: string, callback: any) => {
+  if (value === '') {
+    callback(new Error('请输入账号'))
+    return
+  }
+
+  if (forgotForm.role === 'student') {
+    if (!/^\d{8}$/.test(value)) {
+      callback(new Error('学生账号需为8位数字'))
+      return
+    }
+    if (!value.startsWith('2')) {
+      callback(new Error('学生账号应以2开头'))
+      return
+    }
+  } else if (forgotForm.role === 'teacher') {
+    if (!/^\d{6}$/.test(value)) {
+      callback(new Error('教师账号需为6位数字'))
+      return
+    }
+    if (!value.startsWith('1')) {
+      callback(new Error('教师账号应以1开头'))
+      return
+    }
+  } else if (forgotForm.role === 'admin') {
+    if (!/^\d{6}$/.test(value)) {
+      callback(new Error('管理员账号需为6位数字'))
+      return
+    }
+    if (!value.startsWith('8')) {
+      callback(new Error('管理员账号应以8开头'))
+      return
+    }
+  }
+
+  callback()
+}
+
+const validateConfirmPassword = (_rule: any, value: string, callback: any) => {
+  if (!value) {
+    callback(new Error('请再次输入新密码'))
+    return
+  }
+  if (value !== forgotForm.newPassword) {
+    callback(new Error('两次输入的密码不一致'))
+    return
+  }
+  callback()
+}
+
+const forgotRules = reactive<FormRules>({
+  role: [{ required: true, message: '请选择角色', trigger: 'change' }],
+  account: [{ validator: validateForgotAccount, trigger: 'blur' }],
+  name: [{ required: true, message: '请输入姓名', trigger: 'blur' }],
+  newPassword: [
+    { required: true, message: '请输入新密码', trigger: 'blur' },
+    { min: 6, message: '密码长度不能少于6位', trigger: 'blur' }
+  ],
+  confirmPassword: [{ validator: validateConfirmPassword, trigger: 'blur' }]
+})
+
+const resetForgotForm = () => {
+  forgotForm.role = form.role
+  forgotForm.account = ''
+  forgotForm.name = ''
+  forgotForm.newPassword = ''
+  forgotForm.confirmPassword = ''
+  forgotFormRef.value?.clearValidate()
+}
+
+const openForgotDialog = () => {
+  resetForgotForm()
+  forgotForm.account = form.account
+  forgotVisible.value = true
+}
+
+const handleForgotRoleChange = () => {
+  forgotFormRef.value?.clearValidate()
+}
+
+const handleForgotPassword = async () => {
+  if (!forgotFormRef.value) return
+
+  await forgotFormRef.value.validate(async (valid) => {
+    if (!valid) return
+    forgotLoading.value = true
+
+    try {
+      await axios.post('/auth/forgot-password', {
+        username: forgotForm.account.trim(),
+        role: forgotForm.role,
+        name: forgotForm.name.trim(),
+        new_password: forgotForm.newPassword
+      })
+      ElMessage.success('密码已重置，请使用新密码登录')
+      forgotVisible.value = false
+      resetForgotForm()
+    } catch (error: any) {
+      const detail = error?.response?.data?.detail
+      ElMessage.error(detail || '重置失败，请稍后再试')
+    } finally {
+      forgotLoading.value = false
+    }
+  })
+}
 </script>
 
 <template>
   <div class="ai-login-container">
-    <!-- 顶部系统标题�?-->
+    <!-- 顶部系统标题 -->
     <div class="top-bar">
       <div class="top-bar-content">
         <div class="system-logo">
@@ -163,7 +283,7 @@ const handleRoleChange = () => {
     <div class="glow-orb orb-2"></div>
     <div class="scan-line"></div>
 
-    <!-- 左侧聊天面板：学�?-->
+    <!-- 左侧聊天面板：学生 -->
     <div class="side-panel left-panel">
       <div class="panel-header">
         <el-icon><User /></el-icon>
@@ -183,7 +303,7 @@ const handleRoleChange = () => {
         <!-- AI 回复 1 -->
         <div class="chat-row ai-row anim-slide-1">
           <div class="bubble ai-bubble">
-            请假、销假别慌张，AI 客服来帮�?
+            请假、销假别慌张，AI 客服来帮忙。
           </div>
           <div class="avatar-icon ai-avatar">
             <el-icon><Cpu /></el-icon>
@@ -193,7 +313,7 @@ const handleRoleChange = () => {
         <!-- AI 回复 2 -->
         <div class="chat-row ai-row anim-slide-2">
           <div class="bubble ai-bubble">
-            线上提交一键审核，无需跑腿教务�?
+            线上提交一键审核，无需跑腿教务处。
           </div>
           <div class="avatar-icon ai-avatar">
             <el-icon><Cpu /></el-icon>
@@ -214,7 +334,7 @@ const handleRoleChange = () => {
     
     <!-- 核心交互区域 (中间) -->
     <div class="interaction-box">
-      <!-- 登录表单�?(底层) -->
+      <!-- 登录表单（底层） -->
       <div class="login-form-layer">
         <div class="form-header">
           <h3>登录</h3>
@@ -269,8 +389,7 @@ const handleRoleChange = () => {
           </el-form-item>
           
           <div class="form-footer">
-            <span>忘记密码?</span>
-            <span>演示账号: 20230001 / 123456</span>
+            <button type="button" class="forgot-link" @click="openForgotDialog">忘记密码？</button>
           </div>
         </el-form>
       </div>
@@ -298,7 +417,7 @@ const handleRoleChange = () => {
       </div>
     </div>
 
-    <!-- 右侧聊天面板：教�?-->
+    <!-- 右侧聊天面板：教师 -->
     <div class="side-panel right-panel">
       <div class="panel-header">
         <el-icon><Monitor /></el-icon>
@@ -318,7 +437,7 @@ const handleRoleChange = () => {
         <!-- AI 回复 1 -->
         <div class="chat-row ai-row anim-slide-1">
           <div class="bubble ai-bubble">
-            智能教案来帮你，备课答疑全搞�?
+            智能教案来帮你，备课答疑全搞定。
           </div>
           <div class="avatar-icon ai-avatar">
             <el-icon><Cpu /></el-icon>
@@ -328,7 +447,7 @@ const handleRoleChange = () => {
         <!-- AI 回复 2 -->
         <div class="chat-row ai-row anim-slide-2">
           <div class="bubble ai-bubble">
-            课件知识点自动匹配，答疑模板一键生�?
+            课件知识点自动匹配，答疑模板一键生成。
           </div>
           <div class="avatar-icon ai-avatar">
             <el-icon><Cpu /></el-icon>
@@ -346,6 +465,46 @@ const handleRoleChange = () => {
         </div>
       </div>
     </div>
+
+    <el-dialog v-model="forgotVisible" title="找回密码" width="420px" class="forgot-dialog">
+      <el-form
+        ref="forgotFormRef"
+        :model="forgotForm"
+        :rules="forgotRules"
+        label-width="76px"
+        class="forgot-form"
+      >
+        <el-form-item label="角色" prop="role">
+          <el-radio-group v-model="forgotForm.role" @change="handleForgotRoleChange" fill="#00f2fe">
+            <el-radio-button label="student">学生</el-radio-button>
+            <el-radio-button label="teacher">教师</el-radio-button>
+            <el-radio-button label="admin">管理员</el-radio-button>
+          </el-radio-group>
+        </el-form-item>
+
+        <el-form-item label="账号" prop="account">
+          <el-input v-model="forgotForm.account" :placeholder="getAccountPlaceholder(forgotForm.role)" />
+        </el-form-item>
+
+        <el-form-item label="姓名" prop="name">
+          <el-input v-model="forgotForm.name" placeholder="请输入姓名" />
+        </el-form-item>
+
+        <el-form-item label="新密码" prop="newPassword">
+          <el-input v-model="forgotForm.newPassword" type="password" show-password placeholder="请输入新密码" />
+        </el-form-item>
+
+        <el-form-item label="确认密码" prop="confirmPassword">
+          <el-input v-model="forgotForm.confirmPassword" type="password" show-password placeholder="请再次输入新密码" />
+        </el-form-item>
+
+        <div class="forgot-hint">若校验失败，请联系管理员处理。</div>
+      </el-form>
+      <template #footer>
+        <el-button @click="forgotVisible = false">取消</el-button>
+        <el-button type="primary" :loading="forgotLoading" @click="handleForgotPassword">提交</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -353,7 +512,7 @@ const handleRoleChange = () => {
 /* 引入字体 */
 @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Roboto+Mono:wght@400;500&display=swap');
 
-/* 全局容器：深空背�?*/
+/* 全局容器：深空背景 */
 .ai-login-container {
   height: 100vh;
   width: 100%;
@@ -367,7 +526,7 @@ const handleRoleChange = () => {
   gap: 60px;
 }
 
-/* 顶部系统标题�?*/
+/* 顶部系统标题 */
 .top-bar {
   position: absolute;
   top: 0;
@@ -427,7 +586,7 @@ const handleRoleChange = () => {
   z-index: 1;
 }
 
-/* 扫描线效�?*/
+/* 扫描线效果 */
 .scan-line {
   position: absolute;
   top: 0;
@@ -572,7 +731,7 @@ const handleRoleChange = () => {
 
 .bubble:hover {
   background: rgba(255, 255, 255, 0.08);
-  border-color: rgba(0, 242, 254, 0.3); /* Hover 时微�?*/
+  border-color: rgba(0, 242, 254, 0.3); /* Hover 时微光 */
   box-shadow: 0 0 15px rgba(0, 242, 254, 0.1);
 }
 
@@ -602,7 +761,7 @@ const handleRoleChange = () => {
   overflow: hidden;
   background: rgba(10, 10, 10, 0.6);
   backdrop-filter: blur(20px);
-  border: 1px solid rgba(0, 242, 254, 0.2); /* 科技蓝边�?*/
+  border: 1px solid rgba(0, 242, 254, 0.2); /* 科技蓝边 */
   z-index: 10;
 }
 
@@ -631,7 +790,7 @@ const handleRoleChange = () => {
   z-index: 20;
 }
 
-/* 登录表单�?*/
+/* 登录表单 */
 .login-form-layer {
   width: 100%;
   height: 100%;
@@ -672,7 +831,7 @@ const handleRoleChange = () => {
   width: 380px;
 }
 
-/* 覆盖 Element Plus 输入框样�?- 透明玻璃质感 */
+/* 覆盖 Element Plus 输入框样式 - 透明玻璃质感 */
 :deep(.el-input__wrapper) {
   background-color: transparent !important;
   box-shadow: none !important;
@@ -701,7 +860,7 @@ const handleRoleChange = () => {
   color: rgba(255, 255, 255, 0.4);
 }
 
-/* 角色选择器样�?*/
+/* 角色选择器样式 */
 :deep(.el-radio-group) {
   background: rgba(255, 255, 255, 0.05);
   border-radius: 4px;
@@ -762,6 +921,37 @@ const handleRoleChange = () => {
   font-family: 'Roboto Mono', monospace;
 }
 
+.forgot-link {
+  background: none;
+  border: none;
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 12px;
+  cursor: pointer;
+  padding: 0;
+  font-family: 'Roboto Mono', monospace;
+}
+
+.forgot-link:hover {
+  color: #00f2fe;
+  text-decoration: underline;
+}
+
+.forgot-hint {
+  margin-top: -6px;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+:deep(.forgot-dialog .el-dialog) {
+  background: rgba(10, 10, 10, 0.95);
+  border: 1px solid rgba(0, 242, 254, 0.2);
+  box-shadow: 0 0 25px rgba(0, 242, 254, 0.2);
+}
+
+:deep(.forgot-dialog .el-dialog__title) {
+  color: rgba(255, 255, 255, 0.9);
+}
+
 /* 推拉门层 */
 .sliding-doors {
   position: absolute;
@@ -770,7 +960,7 @@ const handleRoleChange = () => {
   width: 100%;
   height: 100%;
   display: flex;
-  pointer-events: none; /* 让鼠标事件穿透到 interaction-box 来触�?hover */
+  pointer-events: none; /* 让鼠标事件穿透到 interaction-box 来触发 hover */
   z-index: 10;
 }
 
@@ -810,7 +1000,7 @@ const handleRoleChange = () => {
   border-left: 1px solid rgba(0, 242, 254, 0.2);
 }
 
-/* 门上的装饰内�?*/
+/* 门上的装饰内容 */
 .door-content {
   position: absolute;
   display: flex;
@@ -914,7 +1104,7 @@ const handleRoleChange = () => {
 }
 
 .anim-blink {
-  animation: slideInAndBlink 4s ease-out forwards;
+  animation: slideInAndGlow 4s ease-out forwards;
   animation-delay: 3.1s;
 }
 
@@ -933,24 +1123,21 @@ const handleRoleChange = () => {
   to { opacity: 1; transform: translateX(0); }
 }
 
-@keyframes slideInAndBlink {
-  0% { opacity: 0; transform: translateX(20px); }
-  10% { opacity: 1; transform: translateX(0); }
-  100% { opacity: 1; transform: translateX(0); }
-  70% { opacity: 1; }
-  75% { opacity: 0.5; }
-  80% { opacity: 1; }
-  85% { opacity: 0.5; }
-  90% { opacity: 1; }
-  95% { opacity: 0.5; }
+@keyframes slideInAndGlow {
+  0% { opacity: 0; transform: translateX(20px); filter: brightness(1); }
+  12% { opacity: 1; transform: translateX(0); filter: brightness(1); }
+  70% { filter: brightness(1); }
+  80% { filter: brightness(1.08); }
+  90% { filter: brightness(1); }
+  100% { opacity: 1; transform: translateX(0); filter: brightness(1); }
 }
 
 @keyframes slideInAndScale {
   0% { opacity: 0; transform: translateX(20px) scale(1); }
   10% { opacity: 1; transform: translateX(0) scale(1); }
-  80% { transform: scale(1); }
-  90% { transform: scale(1.05); }
-  100% { transform: scale(1); }
+  80% { opacity: 1; transform: scale(1); }
+  90% { opacity: 1; transform: scale(1.05); }
+  100% { opacity: 1; transform: scale(1); }
 }
 
 /* 响应式适配 */

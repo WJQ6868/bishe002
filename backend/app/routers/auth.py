@@ -6,6 +6,10 @@ from loguru import logger
 
 from ..database import get_db
 from ..models.user import User, UserProfile
+from ..models.student import Student
+from ..models.course import Teacher
+from ..models.admin import Admin
+from ..models.admin_user import StudentUser, TeacherUser
 from ..dependencies.auth import (
     verify_password,
     get_password_hash,
@@ -20,6 +24,13 @@ router = APIRouter(tags=["Authentication"])
 
 class ChangePasswordRequest(BaseModel):
     old_password: str
+    new_password: str
+
+
+class ForgotPasswordRequest(BaseModel):
+    username: str
+    role: str
+    name: str
     new_password: str
 
 @router.post("/token")
@@ -125,6 +136,69 @@ def get_role_name(role: str) -> str:
         "admin": "管理员"
     }
     return role_names.get(role, role)
+
+
+@router.post("/auth/forgot-password")
+async def forgot_password(
+    payload: ForgotPasswordRequest,
+    db: AsyncSession = Depends(get_db),
+):
+    username = payload.username.strip()
+    role = payload.role.strip()
+    name = payload.name.strip()
+    new_password = payload.new_password.strip()
+
+    if not username or not role or not name or not new_password:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="请完整填写账号、角色、姓名和新密码")
+    if len(new_password) < 6:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="新密码长度不能少于6位")
+
+    res = await db.execute(select(User).where(User.username == username))
+    user = res.scalars().first()
+    if not user:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="账号不存在")
+    if user.role != role:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="角色与账号不匹配")
+
+    matched = False
+    profile_res = await db.execute(select(UserProfile).where(UserProfile.user_id == user.id))
+    profile = profile_res.scalars().first()
+    if profile and profile.name and profile.name.strip() == name:
+        matched = True
+
+    if not matched:
+        if role == "student":
+            student_res = await db.execute(select(Student).where(Student.id == username))
+            student = student_res.scalars().first()
+            if student and student.name == name:
+                matched = True
+            if not matched:
+                student_user_res = await db.execute(select(StudentUser).where(StudentUser.student_no == username))
+                student_user = student_user_res.scalars().first()
+                if student_user and student_user.name == name:
+                    matched = True
+        elif role == "teacher":
+            teacher_res = await db.execute(select(Teacher).where(Teacher.id == username))
+            teacher = teacher_res.scalars().first()
+            if teacher and teacher.name == name:
+                matched = True
+            if not matched:
+                teacher_user_res = await db.execute(select(TeacherUser).where(TeacherUser.teacher_no == username))
+                teacher_user = teacher_user_res.scalars().first()
+                if teacher_user and teacher_user.name == name:
+                    matched = True
+        elif role == "admin":
+            admin_res = await db.execute(select(Admin).where(Admin.id == username))
+            admin = admin_res.scalars().first()
+            if admin and admin.name == name:
+                matched = True
+
+    if not matched:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="姓名与账号不匹配，请联系管理员")
+
+    user.password = get_password_hash(new_password)
+    await db.commit()
+    return {"message": "Password reset successful"}
 
 
 @router.post("/auth/change-password")
