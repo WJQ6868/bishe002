@@ -12,9 +12,12 @@ const syllabus = ref('')
 const planContent = ref('')
 const selectedModel = ref('')
 const modelOptions = ref<{ label: string; value: string }[]>([])
-const resultDialogVisible = ref(false)
 const viewingTask = ref<LessonPlanTask | null>(null)
 const taskDialogVisible = ref(false)
+const selectedKbDocId = ref<number | null>(null)
+const parsedDoc = ref<TeacherKbDocument | null>(null)
+const parsing = ref(false)
+const currentTaskId = ref<number | null>(null)
 
 const courses = ref<TeacherCourse[]>([])
 const selectedCourseId = ref<number | null>(null)
@@ -96,6 +99,14 @@ const loadLessonPlanTasks = async () => {
 watch(selectedCourseId, async () => {
   await loadKbDocs()
   await loadLessonPlanTasks()
+  selectedKbDocId.value = null
+  parsedDoc.value = null
+})
+
+watch(kbDocs, (docs) => {
+  if (!selectedKbDocId.value && docs.length) {
+    selectedKbDocId.value = docs[0].id
+  }
 })
 
 onMounted(async () => {
@@ -105,22 +116,70 @@ onMounted(async () => {
   await loadLessonPlanTasks()
 })
 
-const openCreatePlan = () => {
+const openCreatePlan = async () => {
+  if (creating.value) {
+    creating.value = false
+    return
+  }
   planTitle.value = ''
   syllabus.value = ''
   planContent.value = ''
+  selectedKbDocId.value = null
+  parsedDoc.value = null
+  currentTaskId.value = null
+  await loadKbDocs()
   creating.value = true
+}
+
+const resolveDocUrl = (url: string) => {
+  if (!url) return url
+  if (url.startsWith('http')) return url
+  const base = (import.meta.env.VITE_API_BASE_URL || '/api').replace(/\/api$/, '')
+  return base ? `${base}${url}` : url
+}
+
+const parseSelectedDoc = async () => {
+  const doc = kbDocs.value.find(d => d.id === selectedKbDocId.value)
+  if (!doc) {
+    ElMessage.error('请选择需要解析的文件')
+    return
+  }
+  parsing.value = true
+  parsedDoc.value = doc
+  let parsedText = `已解析文件：${doc.title}（${doc.original_filename}）`
+  const ext = (doc.file_ext || '').toLowerCase()
+  if (['.txt', '.md', '.csv'].includes(ext)) {
+    try {
+      const res = await fetch(resolveDocUrl(doc.url))
+      if (res.ok) {
+        const text = await res.text()
+        parsedText = text.trim() || parsedText
+      }
+    } catch {
+      // fallback to meta text
+    }
+  }
+  syllabus.value = parsedText
+  parsing.value = false
+  ElMessage.success('文件解析完成')
 }
 
 const assemblePrompt = () => {
   const title = planTitle.value.trim() || '未命名课程'
   const outline = syllabus.value.trim() || '暂未提供课程大纲'
-  return `你是一名高校教师助手。请基于以下课程大纲生成结构化教案，包含教学目标、重难点、教学过程（导入/讲授/练习/总结）、课后作业以及评价方式。课程：${title}。大纲：${outline}`
+  const docInfo = parsedDoc.value
+    ? `已解析文件：${parsedDoc.value.title}（${parsedDoc.value.original_filename}）`
+    : '未选择解析文件'
+  return `你是一名高校教师助手。请基于课程知识库与解析文件生成结构化教案，包含教学目标、重难点、教学过程（导入/讲授/练习/总结）、课后作业以及评价方式。\n课程：${title}\n${docInfo}\n大纲/解析内容：${outline}`
 }
 
 const generatePlan = async () => {
   if (!planTitle.value.trim()) {
     ElMessage.error('请输入教案标题')
+    return
+  }
+  if (!parsedDoc.value) {
+    ElMessage.error('请先选择并解析文件')
     return
   }
   generating.value = true
@@ -133,6 +192,7 @@ const generatePlan = async () => {
       course_id: selectedCourseId.value || undefined
     })
     createdTaskId = task.id
+    currentTaskId.value = createdTaskId
     await streamQA(
       localStorage.getItem('user_id') || '0',
       assemblePrompt(),
@@ -140,15 +200,14 @@ const generatePlan = async () => {
       (chunk) => {
         planContent.value += chunk
       },
-      undefined,
+      selectedModel.value || undefined,
       selectedCourseId.value || undefined,
-      'app:lesson_plan'
+      'lesson_plan'
     )
     if (createdTaskId) {
       await aiPortalApi.updateLessonPlanTaskResult(createdTaskId, { status: 'completed', result: planContent.value })
     }
     ElMessage.success('教案生成完成')
-    resultDialogVisible.value = true
     await loadLessonPlanTasks()
   } catch (err) {
     if (createdTaskId) {
@@ -161,6 +220,36 @@ const generatePlan = async () => {
   } finally {
     generating.value = false
   }
+}
+
+const savePlan = async () => {
+  if (!currentTaskId.value) {
+    ElMessage.warning('请先生成教案')
+    return
+  }
+  await aiPortalApi.updateLessonPlanTaskResult(currentTaskId.value, {
+    status: 'completed',
+    result: planContent.value
+  })
+  ElMessage.success('已保存修改')
+  await loadLessonPlanTasks()
+}
+
+const exportPlan = () => {
+  if (!planContent.value.trim()) {
+    ElMessage.error('暂无可导出的内容')
+    return
+  }
+  const filename = `${planTitle.value.trim() || '教案'}.md`
+  const blob = new Blob([planContent.value], { type: 'text/markdown;charset=utf-8' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = filename
+  document.body.appendChild(a)
+  a.click()
+  a.remove()
+  URL.revokeObjectURL(url)
 }
 
 const openTaskResult = (task: LessonPlanTask) => {
@@ -268,7 +357,6 @@ const doDeleteKb = async (row: TeacherKbDocument) => {
   <div class="lesson-plan-page">
     <div class="header">
       <h2>智能教案</h2>
-      <el-button type="primary" @click="openCreatePlan">新建教案</el-button>
     </div>
 
     <el-alert type="info" show-icon title="功能说明">
@@ -308,6 +396,54 @@ const doDeleteKb = async (row: TeacherKbDocument) => {
       </el-table>
     </el-card>
 
+    <div class="create-entry">
+      <el-button type="primary" @click="openCreatePlan">
+        {{ creating ? '收起新建教案' : '新建教案' }}
+      </el-button>
+    </div>
+
+    <el-card v-if="creating" shadow="never" class="plan-card">
+      <template #header>
+        <div class="card-header">
+          <span>新建教案</span>
+        </div>
+      </template>
+      <el-form label-width="100px">
+        <el-form-item label="解析文件">
+          <div class="inline-row">
+            <el-select v-model="selectedKbDocId" placeholder="选择已上传的文档" style="width: 360px" :disabled="kbDocs.length === 0">
+              <el-option v-for="doc in kbDocs" :key="doc.id" :label="`${doc.title}（${doc.original_filename}）`" :value="doc.id" />
+            </el-select>
+            <el-button type="primary" :loading="parsing" @click="parseSelectedDoc" :disabled="kbDocs.length === 0">解析</el-button>
+            <el-button @click="openUploadKb">上传</el-button>
+          </div>
+          <div class="hint" v-if="parsedDoc">已解析：{{ parsedDoc.title }}（{{ parsedDoc.original_filename }}）</div>
+          <div class="hint" v-if="kbDocs.length === 0">请先上传课程资料</div>
+        </el-form-item>
+        <el-form-item label="标题">
+          <el-input v-model="planTitle" placeholder="例如：软件工程第一章教案" />
+        </el-form-item>
+        <el-form-item label="使用模型（管理员配置）">
+          <el-select v-model="selectedModel" placeholder="由管理员配置" :disabled="true">
+            <el-option v-for="m in modelOptions" :key="m.value" :label="m.label" :value="m.value" />
+          </el-select>
+          <div class="hint">由管理员在 AI 设置中配置，教师端只读</div>
+        </el-form-item>
+        <el-form-item label="解析内容">
+          <el-input v-model="syllabus" type="textarea" :rows="6" placeholder="解析内容将展示在此，可手动修改" />
+        </el-form-item>
+        <el-form-item label="生成结果">
+          <el-input v-model="planContent" type="textarea" :rows="10" placeholder="生成结果将在此展示" />
+        </el-form-item>
+      </el-form>
+      <div class="plan-actions">
+        <el-button @click="creating = false">取消</el-button>
+        <el-button :disabled="!planContent.trim()" @click="savePlan">保存修改</el-button>
+        <el-button :disabled="!planContent.trim()" @click="exportPlan">导出教案</el-button>
+        <el-button type="primary" :loading="generating" @click="generatePlan">生成教案</el-button>
+      </div>
+    </el-card>
+
     <el-card shadow="never">
       <template #header>
         <div class="card-header">
@@ -335,37 +471,6 @@ const doDeleteKb = async (row: TeacherKbDocument) => {
         </el-table-column>
       </el-table>
     </el-card>
-
-    <el-dialog v-model="creating" title="新建教案" width="800px">
-      <el-form label-width="100px">
-        <el-form-item label="标题">
-          <el-input v-model="planTitle" placeholder="例如：软件工程第一章教案" />
-        </el-form-item>
-        <el-form-item label="使用模型（管理员配置）">
-          <el-select v-model="selectedModel" placeholder="由管理员配置" :disabled="true">
-            <el-option v-for="m in modelOptions" :key="m.value" :label="m.label" :value="m.value" />
-          </el-select>
-          <div class="hint">由管理员在 AI 设置中配置，教师端只读</div>
-        </el-form-item>
-        <el-form-item label="课程大纲">
-          <el-input v-model="syllabus" type="textarea" :rows="6" placeholder="粘贴课程大纲或关键要点" />
-        </el-form-item>
-        <el-form-item label="生成结果">
-          <el-input v-model="planContent" type="textarea" :rows="10" placeholder="生成结果将在此展示" />
-        </el-form-item>
-      </el-form>
-      <template #footer>
-        <el-button @click="creating = false">取消</el-button>
-        <el-button type="primary" :loading="generating" @click="generatePlan">生成教案</el-button>
-      </template>
-    </el-dialog>
-
-    <el-dialog v-model="resultDialogVisible" title="生成结果" width="800px">
-      <div style="white-space: pre-wrap; line-height: 1.6">{{ planContent }}</div>
-      <template #footer>
-        <el-button @click="resultDialogVisible = false">关闭</el-button>
-      </template>
-    </el-dialog>
 
     <el-dialog v-model="taskDialogVisible" :title="viewingTask?.title || '教案详情'" width="800px">
       <div style="white-space: pre-wrap; line-height: 1.6">
@@ -446,6 +551,25 @@ const doDeleteKb = async (row: TeacherKbDocument) => {
   display: flex;
   justify-content: space-between;
   align-items: center;
+}
+.inline-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.create-entry {
+  display: flex;
+  justify-content: flex-start;
+}
+.plan-card :deep(.el-form) {
+  margin-top: 10px;
+}
+.plan-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 10px;
 }
 .hint {
   color: var(--el-text-color-secondary);

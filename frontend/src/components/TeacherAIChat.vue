@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, reactive, onMounted, nextTick, computed, watch } from 'vue'
+import { ref, reactive, onMounted, onBeforeUnmount, nextTick, computed, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { 
@@ -59,6 +59,30 @@ const loading = ref(false)
 const chatContainerRef = ref<HTMLElement>()
 const isRecording = ref(false)
 const recognition = ref<any>(null)
+const chatModalRef = ref<HTMLElement>()
+const floatTriggerRef = ref<HTMLElement>()
+
+const sidebarHidden = ref(true)
+const isDragging = ref(false)
+const hasInitPos = ref(false)
+const dragOffset = reactive({ x: 0, y: 0 })
+const modalPos = reactive({ x: 0, y: 0 })
+const modalStyle = computed(() => {
+  if (!hasInitPos.value) {
+    return { left: '50%', top: '50%', transform: 'translate(-50%, -50%)' }
+  }
+  return { left: `${modalPos.x}px`, top: `${modalPos.y}px`, transform: 'none' }
+})
+
+const floatDragging = ref(false)
+const floatMoved = ref(false)
+const floatOffset = reactive({ x: 0, y: 0 })
+const floatPos = reactive({ x: 0, y: 0 })
+const hasFloatPos = ref(false)
+const floatStyle = computed(() => {
+  if (!hasFloatPos.value) return {}
+  return { left: `${floatPos.x}px`, top: `${floatPos.y}px`, right: 'auto', bottom: 'auto' }
+})
 
 // 图表弹窗
 const chartDialogVisible = ref(false)
@@ -181,8 +205,128 @@ const toggleChat = () => {
   if (isVisible.value) {
     scrollToBottom()
     if (currentSession.value) currentSession.value.unread = false
+    ensureModalPosition()
   }
 }
+
+const startFloatDrag = (event: MouseEvent) => {
+  if (isVisible.value) return
+  const el = floatTriggerRef.value
+  if (!el) return
+  const rect = el.getBoundingClientRect()
+  hasFloatPos.value = true
+  floatPos.x = rect.left
+  floatPos.y = rect.top
+  floatOffset.x = event.clientX - rect.left
+  floatOffset.y = event.clientY - rect.top
+  floatDragging.value = true
+  floatMoved.value = false
+  document.body.style.userSelect = 'none'
+}
+
+const onFloatDrag = (event: MouseEvent) => {
+  if (!floatDragging.value || !floatTriggerRef.value) return
+  const el = floatTriggerRef.value
+  const width = el.offsetWidth || 0
+  const height = el.offsetHeight || 0
+  let x = event.clientX - floatOffset.x
+  let y = event.clientY - floatOffset.y
+  const maxX = Math.max(0, window.innerWidth - width)
+  const maxY = Math.max(0, window.innerHeight - height)
+  x = Math.min(Math.max(0, x), maxX)
+  y = Math.min(Math.max(0, y), maxY)
+  const moved = Math.abs(x - floatPos.x) + Math.abs(y - floatPos.y)
+  if (moved > 3) floatMoved.value = true
+  floatPos.x = x
+  floatPos.y = y
+}
+
+const stopFloatDrag = () => {
+  if (!floatDragging.value) return
+  floatDragging.value = false
+  document.body.style.userSelect = ''
+}
+
+const handleFloatClick = () => {
+  if (floatMoved.value) {
+    floatMoved.value = false
+    return
+  }
+  toggleChat()
+}
+
+const ensureModalPosition = () => {
+  nextTick(() => {
+    const el = chatModalRef.value
+    if (!el) return
+    const rect = el.getBoundingClientRect()
+    const maxX = Math.max(0, window.innerWidth - rect.width)
+    const maxY = Math.max(0, window.innerHeight - rect.height)
+    if (!hasInitPos.value) {
+      modalPos.x = Math.max(0, Math.min((window.innerWidth - rect.width) / 2, maxX))
+      modalPos.y = Math.max(0, Math.min((window.innerHeight - rect.height) / 2, maxY))
+      hasInitPos.value = true
+      return
+    }
+    modalPos.x = Math.min(Math.max(0, modalPos.x), maxX)
+    modalPos.y = Math.min(Math.max(0, modalPos.y), maxY)
+  })
+}
+
+const startDrag = (event: MouseEvent) => {
+  const target = event.target as HTMLElement
+  if (target?.closest('.no-drag')) return
+  const el = chatModalRef.value
+  if (!el) return
+  const rect = el.getBoundingClientRect()
+  hasInitPos.value = true
+  modalPos.x = rect.left
+  modalPos.y = rect.top
+  dragOffset.x = event.clientX - rect.left
+  dragOffset.y = event.clientY - rect.top
+  isDragging.value = true
+  document.body.style.userSelect = 'none'
+}
+
+const onDrag = (event: MouseEvent) => {
+  if (!isDragging.value || !chatModalRef.value) return
+  const el = chatModalRef.value
+  const width = el.offsetWidth || 0
+  const height = el.offsetHeight || 0
+  let x = event.clientX - dragOffset.x
+  let y = event.clientY - dragOffset.y
+  const maxX = Math.max(0, window.innerWidth - width)
+  const maxY = Math.max(0, window.innerHeight - height)
+  x = Math.min(Math.max(0, x), maxX)
+  y = Math.min(Math.max(0, y), maxY)
+  modalPos.x = x
+  modalPos.y = y
+}
+
+const stopDrag = () => {
+  if (!isDragging.value) return
+  isDragging.value = false
+  document.body.style.userSelect = ''
+}
+
+const toggleSidebar = () => {
+  sidebarHidden.value = !sidebarHidden.value
+  ensureModalPosition()
+}
+
+onMounted(() => {
+  window.addEventListener('mousemove', onDrag)
+  window.addEventListener('mouseup', stopDrag)
+  window.addEventListener('mousemove', onFloatDrag)
+  window.addEventListener('mouseup', stopFloatDrag)
+})
+
+onBeforeUnmount(() => {
+  window.removeEventListener('mousemove', onDrag)
+  window.removeEventListener('mouseup', stopDrag)
+  window.removeEventListener('mousemove', onFloatDrag)
+  window.removeEventListener('mouseup', stopFloatDrag)
+})
 
 const createNewSession = () => {
   const now = Date.now()
@@ -463,17 +607,24 @@ const useQuickQuestion = (text: string) => {
 <template>
   <div class="teacher-ai-chat">
     <!-- 悬浮触发按钮 -->
-    <div class="float-trigger" @click="toggleChat" v-if="!isVisible">
+    <div
+      class="float-trigger"
+      ref="floatTriggerRef"
+      :style="floatStyle"
+      v-if="!isVisible"
+      @mousedown="startFloatDrag"
+      @click="handleFloatClick"
+    >
       <el-icon :size="28"><ChatRound /></el-icon>
       <span class="trigger-text">{{ appTitle }}</span>
     </div>
 
     <!-- 聊天主窗口 (Modal) -->
     <div class="chat-modal-overlay" v-if="isVisible" @click.self="toggleChat">
-      <div class="chat-modal">
+      <div class="chat-modal" ref="chatModalRef" :class="{ 'sidebar-hidden': sidebarHidden }" :style="modalStyle">
         
         <!-- 左侧会话列表 -->
-        <div class="sidebar">
+        <div class="sidebar" v-if="!sidebarHidden">
           <div class="sidebar-header">
             <span class="app-name">{{ appTitle }}</span>
             <el-button type="primary" size="small" :icon="Plus" class="new-chat-btn" @click="createNewSession">
@@ -511,24 +662,27 @@ const useQuickQuestion = (text: string) => {
         <!-- 右侧聊天区 -->
         <div class="main-area">
           <!-- 顶部 Header -->
-          <div class="chat-header">
+          <div class="chat-header" @mousedown="startDrag">
             <div class="header-left">
               <span class="current-title">{{ currentSession?.title }}</span>
-              <el-icon class="edit-icon" @click="renameSession"><Edit /></el-icon>
+              <el-icon class="edit-icon no-drag" @click="renameSession"><Edit /></el-icon>
             </div>
             
-            <div class="header-right">
-              <el-dropdown trigger="click">
+            <div class="header-right no-drag">
+              <el-dropdown trigger="click" popper-class="ai-more-dropdown">
                 <el-icon class="more-btn"><MoreFilled /></el-icon>
                 <template #dropdown>
                   <el-dropdown-menu>
+                    <el-dropdown-item @click="toggleSidebar">
+                      {{ sidebarHidden ? '显示会话列表' : '隐藏会话列表' }}
+                    </el-dropdown-item>
                     <el-dropdown-item :icon="Delete" @click="deleteSession(currentSessionId)">删除会话</el-dropdown-item>
                     <el-dropdown-item :icon="RefreshRight" @click="currentSession!.messages = []">清空消息</el-dropdown-item>
                   </el-dropdown-menu>
                 </template>
               </el-dropdown>
               
-              <el-icon class="close-btn" @click="toggleChat"><Close /></el-icon>
+              <el-icon class="close-btn no-drag" @click="toggleChat"><Close /></el-icon>
             </div>
           </div>
 
@@ -637,7 +791,7 @@ const useQuickQuestion = (text: string) => {
 :deep(.markdown-body) {
   font-size: 14px;
   line-height: 1.6;
-  color: #333;
+  color: #e6e8eb;
 }
 :deep(.markdown-body pre) {
   background: #f5f5f5;
@@ -728,12 +882,19 @@ const useQuickQuestion = (text: string) => {
 .chat-modal {
   width: 1000px;
   height: 800px;
+  position: fixed;
   background: var(--ai-chat-bg, #f7fbff) !important;
   color: var(--ai-chat-text, #303133) !important;
   border-radius: 12px;
   display: flex;
   overflow: hidden;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+}
+.chat-modal.sidebar-hidden .sidebar {
+  display: none;
+}
+.chat-modal.sidebar-hidden .main-area {
+  width: 100%;
 }
 
 /* 左侧边栏 */
@@ -845,6 +1006,11 @@ const useQuickQuestion = (text: string) => {
   justify-content: space-between;
   align-items: center;
   padding: 0 20px;
+  cursor: move;
+  user-select: none;
+}
+.no-drag {
+  cursor: default;
 }
 .header-left {
   display: flex;
@@ -871,6 +1037,32 @@ const useQuickQuestion = (text: string) => {
   color: var(--ai-chat-text-muted, #aeb4be);
 }
 .more-btn:hover, .close-btn:hover { color: var(--ai-chat-text, #e6e8eb); }
+
+/* 三点下拉菜单（全局样式，避免被 scoped 限制） */
+:global(.ai-more-dropdown.el-popper),
+:global(.ai-more-dropdown.el-dropdown__popper) {
+  background: #2b2f36 !important;
+  border: 1px solid #3a3f46 !important;
+  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.35) !important;
+}
+:global(.ai-more-dropdown .el-dropdown-menu) {
+  background: transparent !important;
+  border: none !important;
+}
+:global(.ai-more-dropdown .el-dropdown-menu__item) {
+  color: #e6e8eb !important;
+}
+:global(.ai-more-dropdown .el-dropdown-menu__item:not(.is-disabled):hover) {
+  background: #3a4452 !important;
+  color: #fff !important;
+}
+:global(.ai-more-dropdown .el-dropdown-menu__item.is-disabled) {
+  color: #7a828e !important;
+}
+:global(.ai-more-dropdown .el-popper__arrow::before) {
+  background: #2b2f36 !important;
+  border: 1px solid #3a3f46 !important;
+}
 
 /* 消息区 */
 .messages-area {
@@ -993,7 +1185,7 @@ const useQuickQuestion = (text: string) => {
 
 /* 输入区 */
 .input-area {
-  padding: 20px;
+  padding: 16px 0 20px;
   background: var(--ai-chat-input-bg, #f7fbff) !important;
   color: var(--ai-chat-text, #303133) !important;
   border-top: 1px solid #f0f0f0;
@@ -1018,10 +1210,11 @@ const useQuickQuestion = (text: string) => {
 
 .input-box {
   border: 1px solid var(--ai-chat-border, #3a3f46);
-  border-radius: 24px;
-  padding: 10px 15px;
-  display: flex;
-  align-items: flex-end;
+  border-radius: 16px;
+  padding: 10px 12px;
+  display: grid;
+  grid-template-columns: 40px 1fr auto;
+  align-items: stretch;
   gap: 10px;
   transition: all 0.2s;
   background: #1f2329;
@@ -1033,8 +1226,11 @@ const useQuickQuestion = (text: string) => {
 
 .input-tools {
   display: flex;
+  flex-direction: column;
   gap: 10px;
-  padding-bottom: 8px;
+  align-items: center;
+  justify-content: center;
+  padding: 4px 0;
 }
 .tool-icon {
   font-size: 20px;
@@ -1050,8 +1246,8 @@ const useQuickQuestion = (text: string) => {
   border: none;
   outline: none;
   resize: none;
-  height: 60px;
-  padding: 8px 0;
+  height: 84px;
+  padding: 6px 0;
   font-size: 14px;
   line-height: 1.5;
   color: var(--ai-chat-text, #e6e8eb);
@@ -1060,9 +1256,9 @@ const useQuickQuestion = (text: string) => {
 .custom-input::placeholder { color: var(--ai-chat-text-muted, #aeb4be); }
 
 .send-btn {
-  border-radius: 20px;
-  padding: 8px 20px;
-  margin-bottom: 4px;
+  border-radius: 16px;
+  padding: 8px 18px;
+  align-self: center;
   background-color: #409EFF;
   border-color: #409EFF;
 }

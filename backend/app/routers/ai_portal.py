@@ -10,6 +10,7 @@ from typing import List, Optional
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, Body
 from sqlalchemy import func, select
+from sqlalchemy.orm import selectinload
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..database import get_db
@@ -498,6 +499,7 @@ async def list_teacher_kb_documents(
     kb = await _ensure_teacher_course_kb(db, teacher_user_id=current_user.id, course_id=course_id)
     stmt = (
         select(AiKnowledgeBaseDocument)
+        .options(selectinload(AiKnowledgeBaseDocument.subject))
         .where(AiKnowledgeBaseDocument.knowledge_base_id == kb.id)
         .order_by(AiKnowledgeBaseDocument.updated_at.desc().nullslast(), AiKnowledgeBaseDocument.id.desc())
     )
