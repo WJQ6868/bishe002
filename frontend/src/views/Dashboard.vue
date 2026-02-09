@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, watch } from 'vue'
+import { ref, onMounted, onUnmounted, watch, computed } from 'vue'
 import axios from 'axios'
 import { ElMessage } from 'element-plus'
 import * as echarts from 'echarts'
@@ -25,6 +25,9 @@ const stats = ref({
   total_teachers: 0,
   available_classrooms: 0
 })
+
+const userRole = ref(localStorage.getItem('user_role') || 'student')
+const showUsageCharts = computed(() => userRole.value === 'admin')
 
 const rangePreset = ref<RangePreset>('7d')
 const customRange = ref<[Date, Date] | null>(null)
@@ -60,6 +63,12 @@ const fetchStats = async () => {
 }
 
 const loadUsageRecords = async () => {
+  if (!showUsageCharts.value) {
+    usageRecords.value = []
+    usageLoading.value = false
+    usageError.value = ''
+    return
+  }
   usageLoading.value = true
   usageError.value = ''
   try {
@@ -205,6 +214,7 @@ const addDaysKey = (bucket: string, step: number) => {
 }
 
 const initCharts = () => {
+  if (!showUsageCharts.value) return
   const lineDom = document.getElementById('activity-chart')
   const usageDom = document.getElementById('usage-3d-chart')
 
@@ -375,13 +385,17 @@ const update3dChart = () => {
 }
 
 const updateCharts = () => {
+  if (!showUsageCharts.value) return
   updateLineChart()
   update3dChart()
 }
 
 const handleRefresh = async () => {
-  await Promise.all([fetchStats(), loadUsageRecords()])
-  updateCharts()
+  await fetchStats()
+  if (showUsageCharts.value) {
+    await loadUsageRecords()
+    updateCharts()
+  }
   ElMessage.success('已刷新')
 }
 
@@ -391,21 +405,29 @@ const resizeCharts = () => {
 }
 
 watch([rangePreset, customRange], async () => {
+  if (!showUsageCharts.value) return
   await loadUsageRecords()
   updateCharts()
 })
 
 watch(userAggMode, () => {
+  if (!showUsageCharts.value) return
   updateCharts()
 })
 
 onMounted(async () => {
   initCharts()
-  await Promise.all([fetchStats(), loadUsageRecords()])
-  updateCharts()
-  timer = setInterval(async () => {
-    await Promise.all([fetchStats(), loadUsageRecords()])
+  await fetchStats()
+  if (showUsageCharts.value) {
+    await loadUsageRecords()
     updateCharts()
+  }
+  timer = setInterval(async () => {
+    await fetchStats()
+    if (showUsageCharts.value) {
+      await loadUsageRecords()
+      updateCharts()
+    }
   }, 60000)
   window.addEventListener('resize', resizeCharts)
 })
@@ -476,7 +498,7 @@ onUnmounted(() => {
       </div>
     </div>
 
-    <div class="charts-row">
+    <div v-if="showUsageCharts" class="charts-row">
       <div class="tech-card chart-card wide">
         <div class="card-header">
           <div>

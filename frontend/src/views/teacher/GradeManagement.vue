@@ -1,15 +1,16 @@
 <script setup lang="ts">
-import { ref, computed, nextTick, watch } from 'vue'
+import { ref, computed, nextTick, watch, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import { Upload, Download, Check, Edit } from '@element-plus/icons-vue'
 import * as echarts from 'echarts'
+import axios from 'axios'
 
 // --- 1. 类型定义 ---
 /**
  * 学生成绩记录
  */
 interface StudentScore {
-  id: number
+  id: string
   studentId: string
   name: string
   className: string
@@ -31,39 +32,18 @@ interface ScoreStat {
   excellentRate: number
 }
 
-// --- 2. 模拟数据 ---
-const courses = [
-  { id: 1, name: 'Python编程', semester: '2024-2025-1' },
-  { id: 2, name: '数据结构', semester: '2024-2025-1' },
-  { id: 3, name: 'Web开发', semester: '2024-2025-1' }
-]
-
-// 生成30名学生的模拟数据
-const generateStudents = (): StudentScore[] => {
-  const students: StudentScore[] = []
-  for (let i = 1; i <= 30; i++) {
-    const hasScore = i <= 20 // 前20个学生已有成绩
-    const midterm = hasScore ? Math.floor(Math.random() * 20 + 70) : null
-    const final = hasScore ? Math.floor(Math.random() * 20 + 70) : null
-    students.push({
-      id: i,
-      studentId: `2023${String(i).padStart(4, '0')}`,
-      name: `学生${i}`,
-      className: `计算机${(i % 3) + 1}班`,
-      usualScore: null,
-      midtermScore: midterm,
-      finalScore: final,
-      totalScore: null,
-      gpa: null
-    })
-  }
-  return students
+interface CourseOption {
+  id: number
+  name: string
+  course_type?: string | null
 }
 
 // --- 3. 状态管理 ---
-const selectedCourse = ref(1)
-const studentScores = ref<StudentScore[]>(generateStudents())
+const courses = ref<CourseOption[]>([])
+const selectedCourse = ref<number | null>(null)
+const studentScores = ref<StudentScore[]>([])
 const loading = ref(false)
+const listLoading = ref(false)
 const hasUnsavedChanges = ref(false)
 const editDialogVisible = ref(false)
 const currentStudent = ref<StudentScore | null>(null)
@@ -159,22 +139,44 @@ const openEditDialog = (student: StudentScore) => {
 }
 
 // 保存单个学生成绩
-const saveStudentScore = () => {
+const saveStudentScore = async () => {
   if (!currentStudent.value) return
+  if (!selectedCourse.value) {
+    ElMessage.warning('请先选择课程')
+    return
+  }
   
-  const index = studentScores.value.findIndex(s => s.id === currentStudent.value!.id)
-  if (index !== -1) {
-    calculateTotalScore(currentStudent.value)
-    studentScores.value[index] = { ...currentStudent.value }
-    hasUnsavedChanges.value = true
+  try {
+    loading.value = true
+    await axios.post('/teacher/grades/save', {
+      course_id: selectedCourse.value,
+      items: [{
+        student_id: currentStudent.value.studentId,
+        midterm_score: currentStudent.value.midtermScore,
+        final_score: currentStudent.value.finalScore
+      }]
+    })
+    const index = studentScores.value.findIndex(s => s.id === currentStudent.value!.id)
+    if (index !== -1) {
+      calculateTotalScore(currentStudent.value)
+      studentScores.value[index] = { ...currentStudent.value }
+    }
+    hasUnsavedChanges.value = false
     editDialogVisible.value = false
     ElMessage.success('成绩修改成功')
+  } catch (e: any) {
+    ElMessage.error(e?.response?.data?.detail || '成绩保存失败')
+  } finally {
+    loading.value = false
   }
 }
 
 // 批量导入
-const handleImport = () => {
-  ElMessage.success('模拟导入成功！已导入30条成绩记录')
+const handleImport = async () => {
+  if (!selectedCourse.value) {
+    ElMessage.warning('请先选择课程')
+    return
+  }
   // 模拟填充所有学生成绩
   studentScores.value.forEach(student => {
     if (student.midtermScore === null && student.finalScore === null) {
@@ -185,6 +187,7 @@ const handleImport = () => {
   })
   hasUnsavedChanges.value = true
   updateChart()
+  await saveAllScores()
 }
 
 // 批量导出
@@ -196,14 +199,32 @@ const handleExport = () => {
 }
 
 // 保存成绩
-const saveAllScores = () => {
+const saveAllScores = async () => {
+  if (!selectedCourse.value) {
+    ElMessage.warning('请先选择课程')
+    return
+  }
   loading.value = true
-  setTimeout(() => {
-    localStorage.setItem('teacher_scores', JSON.stringify(studentScores.value))
+  try {
+    const items = studentScores.value
+      .filter((s) => s.midtermScore !== null || s.finalScore !== null)
+      .map((s) => ({
+        student_id: s.studentId,
+        midterm_score: s.midtermScore,
+        final_score: s.finalScore
+      }))
+    await axios.post('/teacher/grades/save', {
+      course_id: selectedCourse.value,
+      items
+    })
     hasUnsavedChanges.value = false
-    loading.value = false
     ElMessage.success('成绩保存成功')
-  }, 500)
+    await loadStudents()
+  } catch (e: any) {
+    ElMessage.error(e?.response?.data?.detail || '成绩保存失败')
+  } finally {
+    loading.value = false
+  }
 }
 
 // 初始化图表
@@ -220,43 +241,59 @@ const updateChart = () => {
   
   const dist = scoreDistribution.value
   const option = {
+    backgroundColor: 'transparent',
     title: {
       text: '成绩分布统计',
       left: 'center',
       textStyle: {
         fontSize: 16,
         fontWeight: 600,
-        color: '#303133'
+        color: '#fff'
       }
     },
     tooltip: {
       trigger: 'axis',
       axisPointer: {
         type: 'shadow'
-      }
+      },
+      backgroundColor: 'rgba(20, 20, 20, 0.9)',
+      borderColor: 'rgba(255, 255, 255, 0.1)',
+      textStyle: { color: '#fff' }
     },
+    grid: { top: 50, left: '6%', right: '4%', bottom: 30, containLabel: true },
     xAxis: {
       type: 'category',
       data: ['0-59分', '60-69分', '70-79分', '80-89分', '90-100分'],
       axisLabel: {
-        rotate: 0
-      }
+        rotate: 0,
+        color: 'rgba(255,255,255,0.7)'
+      },
+      axisLine: { lineStyle: { color: 'rgba(255,255,255,0.2)' } }
     },
     yAxis: {
       type: 'value',
       name: '人数',
-      minInterval: 1
+      minInterval: 1,
+      axisLabel: { color: 'rgba(255,255,255,0.7)' },
+      nameTextStyle: { color: 'rgba(255,255,255,0.7)' },
+      splitLine: { lineStyle: { color: 'rgba(255,255,255,0.08)' } },
+      axisLine: { lineStyle: { color: 'rgba(255,255,255,0.2)' } }
     },
     series: [{
       name: '人数',
       type: 'bar',
       data: Object.values(dist),
+      barWidth: 26,
       itemStyle: {
-        color: '#52C41A'
+        color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+          { offset: 0, color: 'rgba(0, 242, 254, 0.85)' },
+          { offset: 1, color: 'rgba(0, 242, 254, 0.2)' }
+        ])
       },
       label: {
         show: true,
-        position: 'top'
+        position: 'top',
+        color: '#fff'
       }
     }]
   }
@@ -264,20 +301,61 @@ const updateChart = () => {
   chartInstance.setOption(option)
 }
 
-// 加载本地数据
-const loadLocalData = () => {
-  const saved = localStorage.getItem('teacher_scores')
-  if (saved) {
-    studentScores.value = JSON.parse(saved)
+const loadCourses = async () => {
+  try {
+    const res = await axios.get('/teacher/grades/courses')
+    courses.value = Array.isArray(res.data?.items) ? res.data.items : res.data || []
+    if (courses.value.length && !selectedCourse.value) {
+      selectedCourse.value = courses.value[0].id
+    }
+  } catch (e: any) {
+    ElMessage.error(e?.response?.data?.detail || '课程加载失败')
+    courses.value = []
   }
-  studentScores.value.forEach((student) => calculateTotalScore(student))
 }
 
-loadLocalData()
+const loadStudents = async () => {
+  if (!selectedCourse.value) {
+    studentScores.value = []
+    return
+  }
+  listLoading.value = true
+  try {
+    const res = await axios.get('/teacher/grades/students', { params: { course_id: selectedCourse.value } })
+    const items = Array.isArray(res.data?.items) ? res.data.items : []
+    studentScores.value = items.map((item: any) => {
+      const row: StudentScore = {
+        id: String(item.student_id),
+        studentId: String(item.student_id),
+        name: item.name || '',
+        className: item.class_name || '—',
+        usualScore: null,
+        midtermScore: item.midterm_score ?? null,
+        finalScore: item.final_score ?? null,
+        totalScore: null,
+        gpa: null
+      }
+      calculateTotalScore(row)
+      return row
+    })
+    hasUnsavedChanges.value = false
+    nextTick(() => updateChart())
+  } catch (e: any) {
+    ElMessage.error(e?.response?.data?.detail || '学生成绩加载失败')
+    studentScores.value = []
+  } finally {
+    listLoading.value = false
+  }
+}
 
-// 初始化图表
-nextTick(() => {
+onMounted(async () => {
   initChart()
+  await loadCourses()
+  await loadStudents()
+})
+
+watch(selectedCourse, async () => {
+  await loadStudents()
 })
 
 watch(
@@ -302,13 +380,18 @@ watch(studentScores, () => {
       <div class="header-bar">
         <div class="left-section">
           <span style="margin-right: 10px">选择课程：</span>
-          <el-select v-model="selectedCourse" style="width: 200px">
-            <el-option v-for="course in courses" :key="course.id" :label="`${course.name} (${course.semester})`" :value="course.id" />
+          <el-select v-model="selectedCourse" style="width: 220px" :disabled="courses.length === 0">
+            <el-option
+              v-for="course in courses"
+              :key="course.id"
+              :label="course.course_type ? `${course.name} (${course.course_type})` : course.name"
+              :value="course.id"
+            />
           </el-select>
         </div>
         <div class="right-section">
-          <el-button :icon="Upload" @click="handleImport">批量导入</el-button>
-          <el-button :icon="Download" @click="handleExport">批量导出</el-button>
+          <el-button :icon="Upload" :disabled="!selectedCourse" @click="handleImport">批量导入</el-button>
+          <el-button :icon="Download" :disabled="studentScores.length === 0" @click="handleExport">批量导出</el-button>
           <el-button 
             type="success" 
             :icon="Check" 
@@ -379,6 +462,7 @@ watch(studentScores, () => {
         <span>学生成绩列表（{{ studentScores.length }}人）</span>
       </template>
       <el-table
+        v-loading="listLoading"
         :data="studentScores"
         style="width: 100%"
         border
@@ -533,7 +617,7 @@ watch(studentScores, () => {
   flex-shrink: 0;
 }
 .chart-container {
-  height: 240px;
+  height: 280px;
 }
 .table-card {
   flex: 1;

@@ -2,7 +2,10 @@
 import { ref, onMounted, reactive, computed } from 'vue'
 import * as echarts from 'echarts'
 import { ElMessage } from 'element-plus'
-import { fetchMajors, fetchClasses, type MajorItem, type ClassItem } from '../api/academic'
+import {
+  fetchMajors,
+  type MajorItem,
+} from '../api/academic'
 import axios from 'axios'
 
 // 1. 类型定义
@@ -17,14 +20,14 @@ interface StudentAnalysis {
 }
 
 interface StudentItem {
-  id: number
-  student_no: string
+  student_id: string
   name: string
-  grade_id: number
-  class_id: number
+  avg_score: number
+  failed_courses: number
   major?: string | null
-  student_status: number
-  status: number
+  grade?: string | null
+  class_id?: number | null
+  class_name?: string | null
 }
 
 // 2. 状态管理
@@ -33,7 +36,6 @@ const filters = reactive({
   major: ''
 })
 const majors = ref<MajorItem[]>([])
-const classes = ref<ClassItem[]>([])
 const selectedMajorId = ref<number | null>(null)
 
 const loading = ref(false)
@@ -41,50 +43,38 @@ const riskStudents = ref<StudentAnalysis[]>([])
 const students = ref<StudentItem[]>([])
 const processedIds = ref<Set<string>>(new Set())
 
-const getAuthHeaders = () => {
-  const token = localStorage.getItem('token')
-  return token ? { Authorization: `Bearer ${token}` } : {}
+const parseGradeId = (studentNo: string) => {
+  const match = studentNo.match(/^(20\d{2})/)
+  return match ? Number(match[1]) : null
 }
 
 const loadStudents = async () => {
   try {
-    const res = await axios.get('admin/student/list', { headers: getAuthHeaders() })
-    students.value = res.data || []
+    const gradeValue = filters.grade.replace('级', '').trim()
+    const res = await axios.get('/analysis/student/summary', {
+      params: {
+        grade: gradeValue || undefined,
+        major: selectedMajorName.value || undefined
+      }
+    })
+    students.value = Array.isArray(res.data?.items) ? res.data.items : []
   } catch (e: any) {
     ElMessage.error(e?.response?.data?.detail || '获取学生数据失败')
     students.value = []
   }
 }
 
-const hashSeed = (value: string) => {
-  let hash = 0
-  for (let i = 0; i < value.length; i += 1) {
-    hash = (hash * 31 + value.charCodeAt(i)) >>> 0
-  }
-  return hash
-}
-
-const seededRandom = (seed: number) => {
-  const x = Math.sin(seed) * 10000
-  return x - Math.floor(x)
-}
-
 const buildAnalysisData = (source: StudentItem[]) => {
   return source.map((s) => {
-    const seed = hashSeed(s.student_no || String(s.id))
-    const avgScore = 40 + seededRandom(seed) * 60
-    let failedNum = 0
-    if (avgScore < 60) {
-      failedNum = Math.floor(seededRandom(seed + 1) * 3) + 2
-    } else if (avgScore < 70) {
-      failedNum = Math.floor(seededRandom(seed + 2) * 2)
-    }
-    const absentCount = Math.floor(seededRandom(seed + 3) * 4)
-    const riskLevel: StudentAnalysis['riskLevel'] = failedNum >= 3 ? '高' : failedNum >= 1 ? '中' : '低'
-    const status = processedIds.value.has(s.student_no) ? 'processed' : 'pending'
+    const avgScore = Number(s.avg_score || 0)
+    const failedNum = Number(s.failed_courses || 0)
+    const absentCount = 0
+    const riskLevel: StudentAnalysis['riskLevel'] =
+      avgScore < 60 || failedNum >= 1 ? '高' : avgScore < 70 ? '中' : '低'
+    const status = processedIds.value.has(s.student_id) ? 'processed' : 'pending'
 
     return {
-      id: s.student_no,
+      id: s.student_id,
       name: s.name,
       avgScore: Number(avgScore.toFixed(1)),
       failedNum,
@@ -103,7 +93,8 @@ const selectedMajorName = computed(() => {
 const filteredStudents = computed(() => {
   const gradeId = Number(filters.grade.replace('级', ''))
   return students.value.filter((s) => {
-    const gradeMatch = Number.isFinite(gradeId) ? s.grade_id === gradeId : true
+    const gradeValue = s.grade ? Number(s.grade) : parseGradeId(s.student_id)
+    const gradeMatch = Number.isFinite(gradeId) ? gradeValue === gradeId : true
     const majorMatch = selectedMajorName.value ? (s.major || '') === selectedMajorName.value : true
     return gradeMatch && majorMatch
   })
@@ -132,7 +123,7 @@ const updateCharts = async () => {
   const lowRisk = allData.filter(s => s.riskLevel === '低')
   
   // 更新列表数据
-  riskStudents.value = highRisk.slice(0, 20) // 仅展示前20名高风险
+  riskStudents.value = highRisk.sort((a, b) => a.avgScore - b.avgScore).slice(0, 20) // 仅展示前20名高风险
   
   // 聚类算法原理：KMeans算法，k=3，基于平均分/不及格课程数聚类
   const scatterOption = {
@@ -168,38 +159,29 @@ const updateCharts = async () => {
   
   let barOption: any
   if (selectedMajorId.value) {
-    try {
-      classes.value = await fetchClasses(selectedMajorId.value)
-      const classCountMap = new Map<number, number>()
-      filteredStudents.value.forEach((s) => {
-        classCountMap.set(s.class_id, (classCountMap.get(s.class_id) || 0) + 1)
-      })
-      barOption = {
-        title: { text: '该专业各班级人数统计', left: 'center' },
-        tooltip: { trigger: 'axis' },
-        xAxis: { type: 'category', data: classes.value.map((c) => c.name) },
-        yAxis: { type: 'value', name: '人数' },
-        series: [
-          {
-            type: 'bar',
-            data: classes.value.map((c) => ({ value: classCountMap.get(c.id) || 0, itemStyle: { color: '#409EFF' } })),
-            label: { show: true, position: 'top' }
-          }
-        ]
-      }
-    } catch {
-      barOption = {
-        title: { text: '该专业各班级人数统计', left: 'center' },
-        tooltip: { trigger: 'axis' },
-        xAxis: { type: 'category', data: [] },
-        yAxis: { type: 'value', name: '人数' },
-        series: [{ type: 'bar', data: [] }]
-      }
+    const gradeCountMap = new Map<string, number>()
+    filteredStudents.value.forEach((s) => {
+      const gradeLabel = s.grade || String(parseGradeId(s.student_id) || '未知')
+      gradeCountMap.set(gradeLabel, (gradeCountMap.get(gradeLabel) || 0) + 1)
+    })
+    const gradeLabels = Array.from(gradeCountMap.keys())
+    barOption = {
+      title: { text: '该专业各年级人数统计', left: 'center' },
+      tooltip: { trigger: 'axis' },
+      xAxis: { type: 'category', data: gradeLabels },
+      yAxis: { type: 'value', name: '人数' },
+      series: [
+        {
+          type: 'bar',
+          data: gradeLabels.map((name) => ({ value: gradeCountMap.get(name) || 0, itemStyle: { color: '#409EFF' } })),
+          label: { show: true, position: 'top' }
+        }
+      ]
     }
   } else {
     const majorCountMap = new Map<string, number>()
     highRisk.forEach((s) => {
-      const majorName = selectedMajorName.value || (students.value.find((stu) => stu.student_no === s.id)?.major || '未设置')
+      const majorName = students.value.find((stu) => stu.student_id === s.id)?.major || '未设置'
       majorCountMap.set(majorName, (majorCountMap.get(majorName) || 0) + 1)
     })
     const majorNames = Array.from(majorCountMap.keys())

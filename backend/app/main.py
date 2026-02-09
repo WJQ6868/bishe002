@@ -25,6 +25,7 @@ from .routers import (
     academic,
     admin_ai,
     ai_portal,
+    teacher_grade,
 )
 from fastapi.staticfiles import StaticFiles
 import os
@@ -611,6 +612,7 @@ _routers = [
     quick_link.router,
     quick_link.router_hyphen,
     data_sync.router,
+    teacher_grade.router,
 ]
 
 api_router = APIRouter(prefix="/api")
