@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import asyncio
 import json
+import logging
 from typing import AsyncGenerator, Optional, List
 
 import httpx
@@ -18,6 +20,7 @@ from ..services.ai_workflow import retrieve_top_chunks
 router = APIRouter(prefix="/ai_qa", tags=["AI QA"])
 
 ai_client = QwenClient()
+logger = logging.getLogger(__name__)
 
 
 def _parse_model_id(raw: Optional[str]) -> Optional[int]:
@@ -136,6 +139,50 @@ def _split_text(text: str, size: int = 220) -> List[str]:
     return [text[i : i + size] for i in range(0, len(text), size)]
 
 
+def _describe_upstream_exception(exc: Exception) -> str:
+    if isinstance(exc, httpx.ReadTimeout):
+        return "上游模型响应超时，请稍后重试或在管理端适当提高超时时间"
+    if isinstance(exc, httpx.ConnectTimeout):
+        return "连接模型服务超时，请检查网络连通性或模型接口地址"
+    if isinstance(exc, httpx.ConnectError):
+        return "连接模型服务失败，请检查 endpoint、网络或代理配置"
+    if isinstance(exc, httpx.RemoteProtocolError):
+        return "模型服务连接被中断，请稍后重试"
+    if isinstance(exc, httpx.HTTPError):
+        detail = str(exc).strip()
+        return f"{type(exc).__name__}: {detail}" if detail else f"{type(exc).__name__}"
+    detail = str(exc).strip()
+    return f"{type(exc).__name__}: {detail}" if detail else f"{type(exc).__name__}"
+
+
+async def _post_json_with_retry(
+    client: httpx.AsyncClient,
+    url: str,
+    *,
+    payload: dict,
+    headers: dict,
+    max_attempts: int = 2,
+) -> httpx.Response:
+    last_exc: Optional[Exception] = None
+    for attempt in range(1, max_attempts + 1):
+        try:
+            return await client.post(url, json=payload, headers=headers)
+        except (httpx.TimeoutException, httpx.ConnectError, httpx.ReadError, httpx.WriteError, httpx.RemoteProtocolError) as exc:
+            last_exc = exc
+            logger.warning(
+                "AI upstream request failed on attempt %s/%s: %r",
+                attempt,
+                max_attempts,
+                exc,
+            )
+            if attempt >= max_attempts:
+                raise
+            await asyncio.sleep(min(1.2 * attempt, 2.0))
+    if last_exc:
+        raise last_exc
+    raise RuntimeError("AI upstream request failed without a captured exception")
+
+
 async def _call_model_api(model: AiModelApi, prompt: str) -> AsyncGenerator[str, None]:
     provider = (model.provider or "").strip().lower()
     endpoint = (model.endpoint or "").strip().rstrip("/")
@@ -148,7 +195,10 @@ async def _call_model_api(model: AiModelApi, prompt: str) -> AsyncGenerator[str,
     headers = {"Content-Type": "application/json", "Authorization": f"Bearer {api_key}"}
     headers.update(_parse_api_header(model.api_header))
 
-    timeout = httpx.Timeout(model.timeout_seconds or 30)
+    timeout_seconds = int(model.timeout_seconds or 0)
+    if timeout_seconds < 60:
+        timeout_seconds = 60
+    timeout = httpx.Timeout(timeout_seconds, connect=min(15.0, float(timeout_seconds)), write=min(30.0, float(timeout_seconds)))
     try:
         async with httpx.AsyncClient(timeout=timeout) as client:
             if provider == "dashscope_openai":
@@ -161,7 +211,12 @@ async def _call_model_api(model: AiModelApi, prompt: str) -> AsyncGenerator[str,
                     payload["temperature"] = model.temperature
                 if model.max_output_tokens is not None:
                     payload["max_tokens"] = model.max_output_tokens
-                resp = await client.post(f"{endpoint}/chat/completions", json=payload, headers=headers)
+                resp = await _post_json_with_retry(
+                    client,
+                    f"{endpoint}/chat/completions",
+                    payload=payload,
+                    headers=headers,
+                )
             elif provider == "ark_responses":
                 payload = {
                     "model": model_name,
@@ -170,7 +225,12 @@ async def _call_model_api(model: AiModelApi, prompt: str) -> AsyncGenerator[str,
                 }
                 if model.temperature is not None:
                     payload["temperature"] = model.temperature
-                resp = await client.post(f"{endpoint}/responses", json=payload, headers=headers)
+                resp = await _post_json_with_retry(
+                    client,
+                    f"{endpoint}/responses",
+                    payload=payload,
+                    headers=headers,
+                )
             else:
                 yield f"data: {json.dumps({'content': '不支持的模型 provider，请在管理端检查配置'}, ensure_ascii=False)}\n\n"
                 return
@@ -206,7 +266,8 @@ async def _call_model_api(model: AiModelApi, prompt: str) -> AsyncGenerator[str,
         for piece in _split_text(output_text):
             yield f"data: {json.dumps({'content': piece}, ensure_ascii=False)}\n\n"
     except Exception as e:
-        yield f"data: {json.dumps({'content': f'AI 请求异常: {e}'}, ensure_ascii=False)}\n\n"
+        logger.exception("AI upstream request raised an exception")
+        yield f"data: {json.dumps({'content': f'AI 请求异常: {_describe_upstream_exception(e)}'}, ensure_ascii=False)}\n\n"
 
 
 @router.post("/qa/stream")
