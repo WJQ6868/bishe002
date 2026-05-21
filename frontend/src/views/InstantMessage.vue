@@ -65,8 +65,8 @@ onUnmounted(() => {
 })
 
 const initSocketIO = () => {
-  const host = window.location.hostname
-  socket = io(`http://${host}:8000`, {
+  socket = io(window.location.origin, {
+    path: '/socket.io',
     transports: ['websocket', 'polling']
   })
 

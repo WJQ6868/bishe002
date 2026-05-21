@@ -19,18 +19,16 @@ except ImportError:
 from datetime import datetime, timedelta
 from typing import Dict, Set
 import asyncio
+import os
 from sqlalchemy import select
+
+_origins_env = os.getenv("SOCKETIO_CORS_ORIGINS", "").strip()
+_cors_origins = [x.strip() for x in _origins_env.split(",") if x.strip()] if _origins_env else "*"
 
 # 创建 Socket.IO 服务器 (异步模式)
 sio = socketio.AsyncServer(
     async_mode='asgi',
-    # 显式允许本地前端来源，避免 Origin 校验 403
-    cors_allowed_origins=[
-        "http://localhost:2003",
-        "http://127.0.0.1:2003",
-        "http://localhost:5173",
-        "http://127.0.0.1:5173",
-    ],
+    cors_allowed_origins=_cors_origins,
     cors_credentials=True,
     logger=True,
     engineio_logger=True,

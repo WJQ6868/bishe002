@@ -46,3 +46,12 @@ backend/static/uploads/
 coverage/
 
 third_party/
+
+# Temporary and scratch files
+tmp_*
+_tmp_*
+tmp-*
+*.zip
+*.docx
+edu_system.db
+*.png

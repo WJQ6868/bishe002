@@ -1,0 +1,107 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="3200" height="1080" viewBox="0 0 3200 1080">
+  <style>
+    .title { font: 700 52px "Microsoft YaHei", "SimHei", sans-serif; fill: #111; }
+    .head { font: 700 34px "Microsoft YaHei", "SimHei", sans-serif; fill: #222; }
+    .body-cn { font: 700 30px "Microsoft YaHei", "SimHei", sans-serif; fill: #111; }
+    .body-en { font: 500 30px "Microsoft YaHei", "SimHei", sans-serif; fill: #111; }
+    .body-api { font: 500 26px "Microsoft YaHei", "SimHei", sans-serif; fill: #111; }
+    .label { font: 500 24px "Microsoft YaHei", "SimHei", sans-serif; fill: #222; }
+    .note { font: 500 20px "Microsoft YaHei", "SimHei", sans-serif; fill: #222; }
+    .box { fill: #fff; stroke: #222; stroke-width: 4; }
+    .line { stroke: #222; stroke-width: 4; }
+    .arrow { stroke: #222; stroke-width: 3; fill: none; }
+    .arrowhead { fill: #222; }
+  </style>
+
+  <text x="1600" y="68" text-anchor="middle" class="title">AI模块架构、代码组织与接口关系图</text>
+
+  <!-- Boxes -->
+  <rect x="86" y="105" rx="20" ry="20" width="560" height="700" class="box"/>
+  <rect x="688" y="105" rx="20" ry="20" width="560" height="700" class="box"/>
+  <rect x="1290" y="105" rx="20" ry="20" width="560" height="700" class="box"/>
+  <rect x="1892" y="105" rx="20" ry="20" width="560" height="700" class="box"/>
+  <rect x="2494" y="105" rx="20" ry="20" width="560" height="700" class="box"/>
+
+  <line x1="86" y1="193" x2="646" y2="193" class="line"/>
+  <line x1="688" y1="193" x2="1248" y2="193" class="line"/>
+  <line x1="1290" y1="193" x2="1850" y2="193" class="line"/>
+  <line x1="1892" y1="193" x2="2452" y2="193" class="line"/>
+  <line x1="2494" y1="193" x2="3054" y2="193" class="line"/>
+
+  <!-- Headers -->
+  <text x="366" y="154" text-anchor="middle" class="head">角色与场景层</text>
+  <text x="968" y="154" text-anchor="middle" class="head">前端页面与代码组织</text>
+  <text x="1570" y="154" text-anchor="middle" class="head">后端接口层</text>
+  <text x="2172" y="154" text-anchor="middle" class="head">AI能力编排层</text>
+  <text x="2774" y="154" text-anchor="middle" class="head">数据与资源层</text>
+
+  <!-- Box 1 -->
+  <text x="366" y="260" text-anchor="middle" class="body-cn">学生</text>
+  <text x="366" y="320" text-anchor="middle" class="body-cn">AI客服、课程问答</text>
+  <text x="366" y="410" text-anchor="middle" class="body-cn">教师</text>
+  <text x="366" y="470" text-anchor="middle" class="body-cn">课程助手、智能教案</text>
+  <text x="366" y="560" text-anchor="middle" class="body-cn">管理员</text>
+  <text x="366" y="620" text-anchor="middle" class="body-cn">模型、知识库、工作流配置</text>
+  <text x="366" y="710" text-anchor="middle" class="body-cn">核心问题</text>
+  <text x="366" y="770" text-anchor="middle" class="body-cn">谁来用、从哪进</text>
+
+  <!-- Box 2 -->
+  <text x="968" y="255" text-anchor="middle" class="body-en">AdminAIConfig.vue</text>
+  <text x="968" y="345" text-anchor="middle" class="body-en">CourseAssistant.vue</text>
+  <text x="968" y="435" text-anchor="middle" class="body-en">LessonPlan.vue</text>
+  <text x="968" y="525" text-anchor="middle" class="body-en">StudentAIChat.vue</text>
+  <text x="968" y="615" text-anchor="middle" class="body-en">StudentCourseAssistant.vue</text>
+  <text x="968" y="705" text-anchor="middle" class="body-en">adminAi.ts</text>
+  <text x="968" y="760" text-anchor="middle" class="body-en">aiPortal.ts</text>
+  <text x="968" y="815" text-anchor="middle" class="body-en">ai.ts</text>
+
+  <!-- Box 3 -->
+  <text x="1570" y="250" text-anchor="middle" class="body-api">admin_ai.py / ai_portal.py</text>
+  <text x="1570" y="320" text-anchor="middle" class="body-api">/admin/ai/model-apis</text>
+  <text x="1570" y="390" text-anchor="middle" class="body-api">/admin/ai/workflows/apps</text>
+  <text x="1570" y="460" text-anchor="middle" class="body-api">/admin/ai/workflows/knowledge-bases</text>
+  <text x="1570" y="530" text-anchor="middle" class="body-api">/ai/customer-service/config</text>
+  <text x="1570" y="600" text-anchor="middle" class="body-api">/ai/course-assistant/apps</text>
+  <text x="1570" y="670" text-anchor="middle" class="body-api">/ai/teacher/kb/upload</text>
+  <text x="1570" y="740" text-anchor="middle" class="body-api">/ai/teacher/lesson-plan/tasks</text>
+  <text x="1570" y="810" text-anchor="middle" class="body-api">ai_qa.py / ai_qa/qa/stream</text>
+
+  <!-- Box 4 -->
+  <text x="2172" y="265" text-anchor="middle" class="body-cn">工作流确定场景入口</text>
+  <text x="2172" y="345" text-anchor="middle" class="body-cn">模型优先级选择</text>
+  <text x="2172" y="425" text-anchor="middle" class="body-cn">文档抽取与规范化</text>
+  <text x="2172" y="505" text-anchor="middle" class="body-cn">文本分块与知识整理</text>
+  <text x="2172" y="585" text-anchor="middle" class="body-cn">TF-IDF检索与上下文组装</text>
+  <text x="2172" y="665" text-anchor="middle" class="body-cn">SSE流式输出</text>
+  <text x="2172" y="745" text-anchor="middle" class="body-cn">结果回写与状态保留</text>
+
+  <!-- Box 5 -->
+  <text x="2774" y="275" text-anchor="middle" class="body-en">ai_model_apis</text>
+  <text x="2774" y="360" text-anchor="middle" class="body-en">ai_knowledge_bases</text>
+  <text x="2774" y="445" text-anchor="middle" class="body-en">ai_kb_documents</text>
+  <text x="2774" y="530" text-anchor="middle" class="body-en">ai_kb_chunks</text>
+  <text x="2774" y="615" text-anchor="middle" class="body-en">ai_workflow_apps</text>
+  <text x="2774" y="700" text-anchor="middle" class="body-en">ai_lesson_plan_tasks</text>
+  <text x="2774" y="785" text-anchor="middle" class="body-en">ai_usage_logs</text>
+
+  <!-- Connectors -->
+  <text x="667" y="840" text-anchor="middle" class="label">场景进入</text>
+  <line x1="646" y1="850" x2="686" y2="850" class="arrow"/>
+  <polygon points="686,850 668,842 668,858" class="arrowhead"/>
+
+  <text x="1269" y="840" text-anchor="middle" class="label">页面调用</text>
+  <line x1="1248" y1="850" x2="1288" y2="850" class="arrow"/>
+  <polygon points="1288,850 1270,842 1270,858" class="arrowhead"/>
+
+  <text x="1871" y="840" text-anchor="middle" class="label">接口调度</text>
+  <line x1="1850" y1="850" x2="1890" y2="850" class="arrow"/>
+  <polygon points="1890,850 1872,842 1872,858" class="arrowhead"/>
+
+  <text x="2473" y="840" text-anchor="middle" class="label">数据支撑</text>
+  <line x1="2452" y1="850" x2="2492" y2="850" class="arrow"/>
+  <polygon points="2492,850 2474,842 2474,858" class="arrowhead"/>
+
+  <!-- Note -->
+  <text x="1600" y="1015" text-anchor="middle" class="note">说明：该图将角色入口、前端页面、接口分组、AI能力与底层数据放到同一条设计链上，</text>
+  <text x="1600" y="1045" text-anchor="middle" class="note">用于说明结构关系、代码组织与接口协同方式。</text>
+</svg>

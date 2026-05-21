@@ -4,10 +4,10 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
-    "build": "vue-tsc -b && vite build",
-    "build:no-check": "vite build --mode production",
-    "preview": "vite preview",
+    "dev": "vite --config vite.config.ts",
+    "build": "vue-tsc -b && vite build --config vite.config.ts",
+    "build:no-check": "vite build --config vite.config.ts --mode production",
+    "preview": "vite preview --config vite.config.ts",
     "generate-manual": "node scripts/generate_manual.cjs"
   },
   "dependencies": {
