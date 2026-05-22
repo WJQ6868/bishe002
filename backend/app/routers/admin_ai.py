@@ -64,9 +64,11 @@ from ..services.ai_workflow import delete_document_chunks, extract_text_from_fil
 
 router = APIRouter(prefix="/admin/ai", tags=["Admin AI"])
 
-_BASE_UPLOAD_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "static", "uploads", "kb_base")
-_TEACHER_UPLOAD_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "static", "uploads", "kb_teacher")
-_WORKFLOW_UPLOAD_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "static", "uploads", "kb_workflow")
+_BACKEND_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+_STATIC_ROOT = os.path.join(_BACKEND_DIR, "static")
+_BASE_UPLOAD_DIR = os.path.join(_STATIC_ROOT, "uploads", "kb_base")
+_TEACHER_UPLOAD_DIR = os.path.join(_STATIC_ROOT, "uploads", "kb_teacher")
+_WORKFLOW_UPLOAD_DIR = os.path.join(_STATIC_ROOT, "uploads", "kb_workflow")
 os.makedirs(_BASE_UPLOAD_DIR, exist_ok=True)
 os.makedirs(_TEACHER_UPLOAD_DIR, exist_ok=True)
 os.makedirs(_WORKFLOW_UPLOAD_DIR, exist_ok=True)

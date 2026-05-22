@@ -29,6 +29,7 @@ from .routers import (
 )
 from fastapi.staticfiles import StaticFiles
 import os
+import shutil
 from .database import engine, Base
 from .logging_config import configure_logging
 import logging
@@ -52,6 +53,11 @@ try:
 except Exception:
     socketio = None
     sio = None
+
+APP_DIR = os.path.dirname(__file__)
+BACKEND_DIR = os.path.abspath(os.path.join(APP_DIR, ".."))
+STATIC_ROOT = os.path.join(BACKEND_DIR, "static")
+LEGACY_STATIC_ROOT = os.path.join(APP_DIR, "static")
 
 app = FastAPI(title="Smart University Academic Affairs System")
 
@@ -622,8 +628,31 @@ for router in _routers:
 
 app.include_router(api_router)
 
-if os.path.isdir("static"):
-    app.mount("/static", StaticFiles(directory="static"), name="static")
+def _sync_legacy_uploads() -> None:
+    legacy_uploads = os.path.join(LEGACY_STATIC_ROOT, "uploads")
+    if not os.path.isdir(legacy_uploads):
+        return
+
+    target_uploads = os.path.join(STATIC_ROOT, "uploads")
+    for root, _dirs, files in os.walk(legacy_uploads):
+        rel = os.path.relpath(root, legacy_uploads)
+        target_dir = os.path.join(target_uploads, rel)
+        os.makedirs(target_dir, exist_ok=True)
+        for name in files:
+            src = os.path.join(root, name)
+            dst = os.path.join(target_dir, name)
+            if not os.path.exists(dst):
+                try:
+                    shutil.copy2(src, dst)
+                except Exception:
+                    # best-effort migration only
+                    pass
+
+
+_sync_legacy_uploads()
+
+if os.path.isdir(STATIC_ROOT):
+    app.mount("/static", StaticFiles(directory=STATIC_ROOT), name="static")
 
 @app.get("/")
 async def root():

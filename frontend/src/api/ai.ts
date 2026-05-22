@@ -1,6 +1,7 @@
 const API_BASE = import.meta.env.VITE_API_BASE_URL || '/api'
 
 type StreamHandler = (chunk: string) => void
+type StreamThinkingHandler = (chunk: string) => void
 
 interface StreamQaPayload {
   user_id: string
@@ -23,7 +24,7 @@ const buildHeaders = () => {
   return headers
 }
 
-const parseSseChunk = (raw: string, onChunk: StreamHandler) => {
+const parseSseChunk = (raw: string, onChunk: StreamHandler, onThinking?: StreamThinkingHandler) => {
   if (!raw) return
   const normalized = raw.replace(/\r\n/g, '\n')
   const lines = normalized.split('\n')
@@ -34,6 +35,11 @@ const parseSseChunk = (raw: string, onChunk: StreamHandler) => {
     try {
       const parsed = JSON.parse(payload)
       const content = parsed?.content ?? parsed?.message ?? ''
+      const eventType = parsed?.type
+      if (eventType === 'thinking') {
+        if (content && onThinking) onThinking(String(content))
+        continue
+      }
       if (content) onChunk(String(content))
     } catch {
       onChunk(payload)
@@ -48,7 +54,8 @@ export const streamQA = async (
   onChunk: StreamHandler,
   model?: string,
   courseId?: number,
-  workflow?: string
+  workflow?: string,
+  onThinking?: StreamThinkingHandler
 ) => {
   const payload: StreamQaPayload = {
     user_id: userId,
@@ -77,7 +84,11 @@ export const streamQA = async (
       try {
         const parsed = JSON.parse(text)
         const content = parsed?.content ?? parsed?.detail ?? parsed?.message ?? text
-        onChunk(String(content))
+        if (parsed?.type === 'thinking') {
+          if (onThinking && content) onThinking(String(content))
+        } else {
+          onChunk(String(content))
+        }
       } catch {
         onChunk(text)
       }
@@ -99,12 +110,12 @@ export const streamQA = async (
     while (idx !== -1) {
       const raw = buffer.slice(0, idx).trim()
       buffer = buffer.slice(idx + 2)
-      parseSseChunk(raw, onChunk)
+      parseSseChunk(raw, onChunk, onThinking)
       idx = buffer.indexOf('\n\n')
     }
   }
 
   if (buffer.trim()) {
-    parseSseChunk(buffer.trim(), onChunk)
+    parseSseChunk(buffer.trim(), onChunk, onThinking)
   }
 }

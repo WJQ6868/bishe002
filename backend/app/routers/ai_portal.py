@@ -424,7 +424,9 @@ async def delete_teacher_course_assistant_app(
     await db.commit()
     return {"ok": True}
 
-_TEACHER_UPLOAD_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "static", "uploads", "kb_teacher")
+_BACKEND_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+_STATIC_ROOT = os.path.join(_BACKEND_DIR, "static")
+_TEACHER_UPLOAD_DIR = os.path.join(_STATIC_ROOT, "uploads", "kb_teacher")
 os.makedirs(_TEACHER_UPLOAD_DIR, exist_ok=True)
 
 

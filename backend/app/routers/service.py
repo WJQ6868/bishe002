@@ -18,7 +18,9 @@ router = APIRouter(
     responses={404: {"description": "Not found"}},
 )
 
-UPLOAD_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "static", "uploads", "service")
+_BACKEND_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+_STATIC_ROOT = os.path.join(_BACKEND_DIR, "static")
+UPLOAD_DIR = os.path.join(_STATIC_ROOT, "uploads", "service")
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 # Pydantic Models

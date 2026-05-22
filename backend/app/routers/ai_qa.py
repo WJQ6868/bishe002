@@ -22,6 +22,12 @@ router = APIRouter(prefix="/ai_qa", tags=["AI QA"])
 ai_client = QwenClient()
 logger = logging.getLogger(__name__)
 
+SSE_HEADERS = {
+    "Cache-Control": "no-cache",
+    "Connection": "keep-alive",
+    "X-Accel-Buffering": "no",
+}
+
 
 def _parse_model_id(raw: Optional[str]) -> Optional[int]:
     if not raw:
@@ -139,6 +145,109 @@ def _split_text(text: str, size: int = 220) -> List[str]:
     return [text[i : i + size] for i in range(0, len(text), size)]
 
 
+def _make_sse_payload(content: str, kind: str = "answer") -> str:
+    return f"data: {json.dumps({'type': kind, 'content': content}, ensure_ascii=False)}\n\n"
+
+
+def _thinking_steps(kb_ids: List[int]) -> List[str]:
+    steps: List[str] = []
+    if kb_ids:
+        steps.append("正在检索知识库片段")
+        steps.append("正在整理检索结果")
+    else:
+        steps.append("正在分析问题")
+    steps.append("正在生成回答")
+    return steps
+
+
+def _extract_non_stream_text(provider: str, body: str) -> str:
+    text = (body or "").strip()
+    if not text:
+        return ""
+    try:
+        data = json.loads(text)
+    except Exception:
+        return text
+
+    if provider == "dashscope_openai":
+        return (
+            data.get("choices", [{}])[0]
+            .get("message", {})
+            .get("content", "")
+            or text
+        )
+
+    if provider == "ark_responses":
+        output = data.get("output") or data.get("data") or []
+        if isinstance(output, list) and output:
+            contents = output[0].get("content") if isinstance(output[0], dict) else None
+            if isinstance(contents, list) and contents:
+                value = contents[0].get("text", "") or contents[0].get("output_text", "")
+                if value:
+                    return value
+        return data.get("output_text") or data.get("message") or text
+
+    return text
+
+
+def _extract_stream_text(payload: str) -> str:
+    if not payload or payload == "[DONE]":
+        return ""
+    try:
+        data = json.loads(payload)
+    except Exception:
+        return payload
+
+    if not isinstance(data, dict):
+        return str(data)
+
+    choices = data.get("choices")
+    if isinstance(choices, list) and choices:
+        choice = choices[0] or {}
+        delta = choice.get("delta") or choice.get("message") or {}
+        if isinstance(delta, dict):
+            content = delta.get("content") or delta.get("text")
+            if content:
+                return str(content)
+
+    for key in ("output_text", "content", "message", "text"):
+        value = data.get(key)
+        if isinstance(value, str) and value:
+            return value
+        if isinstance(value, dict):
+            inner = value.get("content") or value.get("text")
+            if isinstance(inner, str) and inner:
+                return inner
+
+    output = data.get("output") or data.get("data")
+    if isinstance(output, list) and output:
+        first = output[0]
+        if isinstance(first, dict):
+            contents = first.get("content")
+            if isinstance(contents, list) and contents:
+                item = contents[0]
+                if isinstance(item, dict):
+                    inner = item.get("text") or item.get("output_text")
+                    if isinstance(inner, str) and inner:
+                        return inner
+
+    return ""
+
+
+async def _iter_sse_events(response: httpx.Response) -> AsyncGenerator[str, None]:
+    buffer: List[str] = []
+    async for line in response.aiter_lines():
+        if not line:
+            if buffer:
+                yield "\n".join(buffer)
+                buffer = []
+            continue
+        if line.startswith("data:"):
+            buffer.append(line[5:].strip())
+    if buffer:
+        yield "\n".join(buffer)
+
+
 def _describe_upstream_exception(exc: Exception) -> str:
     if isinstance(exc, httpx.ReadTimeout):
         return "上游模型响应超时，请稍后重试或在管理端适当提高超时时间"
@@ -189,7 +298,7 @@ async def _call_model_api(model: AiModelApi, prompt: str) -> AsyncGenerator[str,
     model_name = (model.model_name or "").strip()
     api_key = (model.api_key or "").strip()
     if not endpoint or not model_name or not api_key:
-        yield f"data: {json.dumps({'content': 'AI 模型未完整配置，请在管理端补全 API Key/Endpoint/模型名称'}, ensure_ascii=False)}\n\n"
+        yield _make_sse_payload("AI 模型未完整配置，请在管理端补全 API Key/Endpoint/模型名称")
         return
 
     headers = {"Content-Type": "application/json", "Authorization": f"Bearer {api_key}"}
@@ -205,69 +314,79 @@ async def _call_model_api(model: AiModelApi, prompt: str) -> AsyncGenerator[str,
                 payload = {
                     "model": model_name,
                     "messages": [{"role": "user", "content": prompt}],
-                    "stream": False,
+                    "stream": True,
                 }
                 if model.temperature is not None:
                     payload["temperature"] = model.temperature
                 if model.max_output_tokens is not None:
                     payload["max_tokens"] = model.max_output_tokens
-                resp = await _post_json_with_retry(
-                    client,
+                async with client.stream(
+                    "POST",
                     f"{endpoint}/chat/completions",
-                    payload=payload,
-                    headers=headers,
-                )
-            elif provider == "ark_responses":
+                    json=payload,
+                    headers={**headers, "Accept": "text/event-stream"},
+                ) as resp:
+                    if resp.status_code < 200 or resp.status_code >= 300:
+                        body = (await resp.aread()).decode("utf-8", errors="ignore")
+                        msg = f"AI 接口请求失败: HTTP {resp.status_code} {body[:200]}"
+                        yield _make_sse_payload(msg)
+                        return
+                    content_type = resp.headers.get("content-type", "")
+                    if "text/event-stream" in content_type:
+                        async for raw in _iter_sse_events(resp):
+                            if raw == "[DONE]":
+                                break
+                            chunk = _extract_stream_text(raw)
+                            if chunk:
+                                yield _make_sse_payload(chunk)
+                        return
+
+                    body = (await resp.aread()).decode("utf-8", errors="ignore")
+                    output_text = _extract_non_stream_text(provider, body)
+                    for piece in _split_text(output_text):
+                        yield _make_sse_payload(piece)
+                    return
+
+            if provider == "ark_responses":
                 payload = {
                     "model": model_name,
-                    "stream": False,
+                    "stream": True,
                     "input": [{"role": "user", "content": [{"type": "input_text", "text": prompt}]}],
                 }
                 if model.temperature is not None:
                     payload["temperature"] = model.temperature
-                resp = await _post_json_with_retry(
-                    client,
+                async with client.stream(
+                    "POST",
                     f"{endpoint}/responses",
-                    payload=payload,
-                    headers=headers,
-                )
-            else:
-                yield f"data: {json.dumps({'content': '不支持的模型 provider，请在管理端检查配置'}, ensure_ascii=False)}\n\n"
-                return
+                    json=payload,
+                    headers={**headers, "Accept": "text/event-stream"},
+                ) as resp:
+                    if resp.status_code < 200 or resp.status_code >= 300:
+                        body = (await resp.aread()).decode("utf-8", errors="ignore")
+                        msg = f"AI 接口请求失败: HTTP {resp.status_code} {body[:200]}"
+                        yield _make_sse_payload(msg)
+                        return
+                    content_type = resp.headers.get("content-type", "")
+                    if "text/event-stream" in content_type:
+                        async for raw in _iter_sse_events(resp):
+                            if raw == "[DONE]":
+                                break
+                            chunk = _extract_stream_text(raw)
+                            if chunk:
+                                yield _make_sse_payload(chunk)
+                        return
 
-        if resp.status_code < 200 or resp.status_code >= 300:
-            msg = f"AI 接口请求失败: HTTP {resp.status_code} {resp.text[:200]}"
-            yield f"data: {json.dumps({'content': msg}, ensure_ascii=False)}\n\n"
+                    body = (await resp.aread()).decode("utf-8", errors="ignore")
+                    output_text = _extract_non_stream_text(provider, body)
+                    for piece in _split_text(output_text):
+                        yield _make_sse_payload(piece)
+                    return
+
+            yield _make_sse_payload("不支持的模型 provider，请在管理端检查配置")
             return
-
-        output_text = ""
-        try:
-            data = resp.json()
-            if provider == "dashscope_openai":
-                output_text = (
-                    data.get("choices", [{}])[0]
-                    .get("message", {})
-                    .get("content", "")
-                )
-            elif provider == "ark_responses":
-                output = data.get("output") or data.get("data") or []
-                if isinstance(output, list) and output:
-                    contents = output[0].get("content") if isinstance(output[0], dict) else None
-                    if isinstance(contents, list) and contents:
-                        output_text = contents[0].get("text", "") or contents[0].get("output_text", "")
-                if not output_text and isinstance(data, dict):
-                    output_text = data.get("output_text") or data.get("message", "") or ""
-        except Exception:
-            output_text = ""
-
-        if not output_text:
-            output_text = (resp.text or "").strip()
-
-        for piece in _split_text(output_text):
-            yield f"data: {json.dumps({'content': piece}, ensure_ascii=False)}\n\n"
     except Exception as e:
         logger.exception("AI upstream request raised an exception")
-        yield f"data: {json.dumps({'content': f'AI 请求异常: {_describe_upstream_exception(e)}'}, ensure_ascii=False)}\n\n"
+        yield _make_sse_payload(f"AI 请求异常: {_describe_upstream_exception(e)}")
 
 
 @router.post("/qa/stream")
@@ -283,18 +402,27 @@ async def stream_qa(request: QARequest, db: AsyncSession = Depends(get_db)):
 
     if model:
         async def gen():
+            for step in _thinking_steps(kb_ids):
+                yield _make_sse_payload(step, "thinking")
             async for chunk in _call_model_api(model, prompt):
                 yield chunk
 
-        return StreamingResponse(gen(), media_type="text/event-stream")
+        return StreamingResponse(gen(), media_type="text/event-stream", headers=SSE_HEADERS)
 
     if ai_client.api_key:
+        async def gen_qwen():
+            for step in _thinking_steps(kb_ids):
+                yield _make_sse_payload(step, "thinking")
+            for chunk in ai_client.call_stream_api(request.user_id, prompt, request.history_flag):
+                yield chunk
+
         return StreamingResponse(
-            ai_client.call_stream_api(request.user_id, prompt, request.history_flag),
+            gen_qwen(),
             media_type="text/event-stream",
+            headers=SSE_HEADERS,
         )
 
     async def gen_err():
-        yield f"data: {json.dumps({'content': 'AI 模型未配置，请在管理端配置并启用模型'}, ensure_ascii=False)}\n\n"
+        yield _make_sse_payload("AI 模型未配置，请在管理端配置并启用模型")
 
-    return StreamingResponse(gen_err(), media_type="text/event-stream")
+    return StreamingResponse(gen_err(), media_type="text/event-stream", headers=SSE_HEADERS)

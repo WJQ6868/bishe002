@@ -35,6 +35,7 @@ interface ChatMessage {
   content: string
   timestamp: number
   isStreaming?: boolean
+  thinking?: string
   modelName?: string
   operable?: boolean
   // 教师端专属
@@ -425,16 +426,18 @@ const handleSend = async (content: string = inputContent.value) => {
     id: (Date.now() + 1).toString(),
     role: 'ai',
     content: '',
+    thinking: '',
     timestamp: Date.now(),
     isStreaming: true,
     modelName: appTitle
   }
   currentSession.value.messages.push(aiMsg)
+  const aiMsgRef = currentSession.value.messages[currentSession.value.messages.length - 1]
 
   const workflowCode = customerWorkflow.value || 'customer_service'
   if (!workflowCode) {
-    aiMsg.content = 'AI???????????????'
-    aiMsg.isStreaming = false
+    aiMsgRef.content = 'AI???????????????'
+    aiMsgRef.isStreaming = false
     loading.value = false
     return
   }
@@ -445,21 +448,26 @@ const handleSend = async (content: string = inputContent.value) => {
       question,
       false,
       (chunk) => {
-        aiMsg.content += chunk
+        aiMsgRef.content += chunk
         scrollToBottom()
       },
       undefined,
       undefined,
-      workflowCode
+      workflowCode,
+      (chunk) => {
+        if (!chunk || aiMsgRef.content) return
+        aiMsgRef.thinking = aiMsgRef.thinking ? `${aiMsgRef.thinking}\n${chunk}` : chunk
+        scrollToBottom()
+      }
     )
   } catch (err) {
     console.error(err)
-    if (!aiMsg.content) {
-      aiMsg.content = 'AI?????????????????'
+    if (!aiMsgRef.content) {
+      aiMsgRef.content = 'AI?????????????????'
     }
     ElMessage.error('AI??????????')
   } finally {
-    aiMsg.isStreaming = false
+    aiMsgRef.isStreaming = false
     loading.value = false
     scrollToBottom()
   }
@@ -695,7 +703,14 @@ const useQuickQuestion = (text: string) => {
               
               <div class="message-content-wrapper">
                 <div class="bubble" :class="msg.role">
-                  <div v-if="msg.role === 'ai'" class="markdown-body" v-html="renderMarkdown(msg.content)"></div>
+                  <div v-if="msg.role === 'ai'" class="markdown-body">
+                    <div v-if="msg.thinking && msg.isStreaming && !msg.content" class="thinking-block">
+                      <div class="thinking-title">思考过程</div>
+                      <div class="thinking-content">{{ msg.thinking }}</div>
+                    </div>
+                    <div v-if="msg.content" class="answer-title">回答</div>
+                    <div v-html="renderMarkdown(msg.content)"></div>
+                  </div>
                   <div v-else>{{ msg.content }}</div>
                 </div>
                 
@@ -815,6 +830,28 @@ const useQuickQuestion = (text: string) => {
 :deep(.markdown-body a) {
   color: #409EFF;
   text-decoration: none;
+}
+.thinking-block {
+  margin-bottom: 8px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.2);
+  border: 1px dashed rgba(255, 255, 255, 0.15);
+}
+.thinking-title {
+  font-size: 12px;
+  color: #aeb4be;
+  margin-bottom: 4px;
+}
+.thinking-content {
+  white-space: pre-wrap;
+  font-size: 13px;
+  color: #c5cad4;
+}
+.answer-title {
+  margin: 6px 0 4px;
+  font-size: 12px;
+  color: #aeb4be;
 }
 
 /* 悬浮按钮 - 同步学生端蓝色 */
