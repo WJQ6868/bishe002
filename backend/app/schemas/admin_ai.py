@@ -138,6 +138,15 @@ class AiKbDocumentOut(BaseModel):
     chunk_count: Optional[int] = None
 
 
+class AiKbDocumentPreviewOut(BaseModel):
+    id: int
+    title: str
+    original_filename: str
+    file_ext: str
+    preview_text: str
+    truncated: bool = False
+
+
 class AiModelKbUpdateRequest(BaseModel):
     kb_document_ids: List[int] = Field(default_factory=list)
 

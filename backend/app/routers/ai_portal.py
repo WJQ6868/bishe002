@@ -825,6 +825,22 @@ async def update_lesson_plan_task_result(
     await db.commit()
     await db.refresh(task)
     return _lesson_plan_task_to_out(task)
+
+
+@router.delete("/teacher/lesson-plan/tasks/{task_id}")
+async def delete_lesson_plan_task(
+    task_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    if current_user.role != "teacher":
+        raise HTTPException(status_code=403, detail="Only teachers can access")
+    task = await _load_teacher_task(db, current_user.id, task_id)
+    await db.delete(task)
+    await db.commit()
+    return {"ok": True}
+
+
 @router.get("/student/course-ai/list", response_model=List[StudentCourseAiItemOut])
 async def list_student_course_ais(db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
     if current_user.role != "student":

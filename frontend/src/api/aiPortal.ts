@@ -196,6 +196,9 @@ export const aiPortalApi = {
   async updateLessonPlanTaskResult(taskId: number, payload: LessonPlanTaskResultPayload) {
     const res = await axios.put<LessonPlanTask>(`/ai/teacher/lesson-plan/tasks/${taskId}/result`, payload, { headers: authHeaders() })
     return res.data
+  },
+  async deleteLessonPlanTask(taskId: number) {
+    await axios.delete(`/ai/teacher/lesson-plan/tasks/${taskId}`, { headers: authHeaders() })
   }
 }
 

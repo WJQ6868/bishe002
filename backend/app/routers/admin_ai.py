@@ -37,6 +37,7 @@ from ..schemas.admin_ai import (
     AiKnowledgeBaseOut,
     AiKnowledgeBaseUpdate,
     AiKbDocumentOut,
+    AiKbDocumentPreviewOut,
     AiKbSubjectCreate,
     AiKbSubjectOut,
     AiCustomModelCreate,
@@ -85,6 +86,17 @@ def _slugify(name: str) -> str:
     slug = re.sub(r"[^a-zA-Z0-9]+", "-", (name or "").strip().lower())
     slug = re.sub(r"-{2,}", "-", slug).strip("-")
     return slug or uuid.uuid4().hex[:8]
+
+
+def _resolve_upload_path(stored_filename: str) -> Optional[str]:
+    stored = (stored_filename or "").strip()
+    if not stored:
+        return None
+    for folder in (_WORKFLOW_UPLOAD_DIR, _BASE_UPLOAD_DIR, _TEACHER_UPLOAD_DIR):
+        abs_path = os.path.join(folder, stored)
+        if os.path.isfile(abs_path):
+            return abs_path
+    return None
 
 
 async def _save_upload(file: UploadFile, upload_dir: str) -> dict:
@@ -694,6 +706,52 @@ async def list_workflow_documents(
             )
         )
     return out
+
+
+@router.get("/workflows/documents/{doc_id}/preview", response_model=AiKbDocumentPreviewOut)
+async def preview_workflow_document(
+    doc_id: int,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(get_current_admin),
+):
+    doc = (
+        await db.execute(select(AiKnowledgeBaseDocument).where(AiKnowledgeBaseDocument.id == doc_id))
+    ).scalars().first()
+    if not doc:
+        raise HTTPException(status_code=404, detail="文档不存在")
+
+    preview_text = ""
+    abs_path = _resolve_upload_path(doc.stored_filename)
+    if abs_path:
+        preview_text = extract_text_from_file(abs_path, doc.file_ext)
+
+    if not preview_text.strip():
+        chunk_rows = await db.execute(
+            select(AiKnowledgeBaseChunk.content)
+            .where(AiKnowledgeBaseChunk.document_id == doc.id)
+            .order_by(AiKnowledgeBaseChunk.seq.asc())
+        )
+        preview_text = "\n".join(
+            str(item).strip() for item in chunk_rows.scalars().all() if str(item).strip()
+        )
+
+    preview_text = (preview_text or "").strip()
+    truncated = False
+    if len(preview_text) > 20000:
+        preview_text = preview_text[:20000].rstrip() + "\n\n……预览内容已截断，完整内容请下载查看。"
+        truncated = True
+
+    if not preview_text:
+        preview_text = "当前文档暂时无法提取预览内容，请尝试下载后查看。"
+
+    return AiKbDocumentPreviewOut(
+        id=doc.id,
+        title=doc.title,
+        original_filename=doc.original_filename,
+        file_ext=doc.file_ext,
+        preview_text=preview_text,
+        truncated=truncated,
+    )
 
 
 @router.post("/workflows/knowledge-bases/{kb_id}/documents/upload", response_model=AiKbDocumentOut)
@@ -1389,4 +1447,3 @@ async def list_ai_usage(
         })
 
     return AiUsageListOut(total=len(records), records=records)
-

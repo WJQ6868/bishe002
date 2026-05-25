@@ -101,6 +101,11 @@ const testResult = ref('')
 const testApiKey = ref('')
 const testLoading = ref(false)
 const testingModel = ref<AiModelApiItem | null>(null)
+const previewDialogVisible = ref(false)
+const previewLoading = ref(false)
+const previewDocInfo = ref<AiKbDocument | null>(null)
+const previewContent = ref('')
+const previewTruncated = ref(false)
 
 const currentApp = computed(() => workflowApps.value.find(app => app.code === editingAppCode.value))
 const showCustomerFields = computed(() => (currentApp.value?.type || editingAppCode.value) === 'customer_service')
@@ -415,8 +420,38 @@ const deleteDoc = async (doc: AiKbDocument) => {
   }
 }
 
-const previewDoc = (doc: AiKbDocument) => {
-  window.open(doc.url, '_blank')
+const previewDoc = async (doc: AiKbDocument) => {
+  previewDocInfo.value = doc
+  previewContent.value = '正在加载预览内容...'
+  previewTruncated.value = false
+  previewDialogVisible.value = true
+  previewLoading.value = true
+  try {
+    const res = await adminAiApi.previewWorkflowDocument(doc.id)
+    previewContent.value = res.preview_text || '暂无可预览内容'
+    previewTruncated.value = res.truncated
+  } catch {
+    previewContent.value = '预览失败，请稍后重试。'
+    ElMessage.error('预览失败')
+  } finally {
+    previewLoading.value = false
+  }
+}
+
+const downloadPreviewDoc = () => {
+  const doc = previewDocInfo.value
+  if (!doc?.url) {
+    ElMessage.error('当前文档没有可下载地址')
+    return
+  }
+  const link = document.createElement('a')
+  link.href = doc.url
+  link.download = doc.original_filename || doc.title || '文档'
+  link.target = '_blank'
+  link.rel = 'noopener'
+  document.body.appendChild(link)
+  link.click()
+  link.remove()
 }
 
 const selectKb = (id: number) => {
@@ -548,6 +583,28 @@ const deleteWorkflow = async (code: string) => {
             </template>
           </el-table-column>
         </el-table>
+        <el-dialog
+          v-model="previewDialogVisible"
+          :title="previewDocInfo ? `${previewDocInfo.title} - 文档预览` : '文档预览'"
+          width="920px"
+          append-to-body
+          destroy-on-close
+        >
+          <div v-loading="previewLoading" class="preview-panel">
+            <div v-if="previewDocInfo" class="preview-meta">
+              <span>文件名：{{ previewDocInfo.original_filename }}</span>
+              <span>格式：{{ previewDocInfo.file_ext }}</span>
+              <span v-if="previewTruncated" class="preview-tip">内容较长，已截断显示</span>
+            </div>
+            <el-scrollbar height="560px" class="preview-scroll">
+              <pre class="preview-content">{{ previewContent }}</pre>
+            </el-scrollbar>
+          </div>
+          <template #footer>
+            <el-button type="primary" @click="downloadPreviewDoc">下载</el-button>
+            <el-button @click="previewDialogVisible = false">关闭</el-button>
+          </template>
+        </el-dialog>
       </el-tab-pane>
       <el-tab-pane label="知识库管理" name="kb">
         <div class="kb-toolbar">
@@ -865,6 +922,36 @@ const deleteWorkflow = async (code: string) => {
 .app-actions {
   text-align: right;
   margin-top: 12px;
+}
+.preview-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.preview-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.72);
+}
+.preview-tip {
+  color: #f3d36b;
+}
+.preview-scroll {
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.03);
+}
+.preview-content {
+  margin: 0;
+  padding: 16px;
+  white-space: pre-wrap;
+  word-break: break-word;
+  line-height: 1.7;
+  color: #f5f7fa;
+  font-family: Consolas, "Courier New", monospace;
+  font-size: 14px;
 }
 .hint {
   color: rgba(255, 255, 255, 0.6);

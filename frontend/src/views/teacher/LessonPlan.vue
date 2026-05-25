@@ -32,6 +32,7 @@ const kbEditForm = reactive({ id: 0, title: '', subject: '' })
 const kbReplaceForm = reactive({ id: 0, file: null as File | null })
 
 const lessonPlanTasks = ref<LessonPlanTask[]>([])
+const deletingTaskId = ref<number | null>(null)
 
 const statusText = (status: string) => {
   switch (status) {
@@ -138,6 +139,11 @@ const resolveDocUrl = (url: string) => {
   return base ? `${base}${url}` : url
 }
 
+const openDocumentUrl = (url: string) => {
+  const target = resolveDocUrl(url)
+  if (target) window.open(target, '_blank', 'noopener')
+}
+
 const parseSelectedDoc = async () => {
   const doc = kbDocs.value.find(d => d.id === selectedKbDocId.value)
   if (!doc) {
@@ -170,7 +176,55 @@ const assemblePrompt = () => {
   const docInfo = parsedDoc.value
     ? `已解析文件：${parsedDoc.value.title}（${parsedDoc.value.original_filename}）`
     : '未选择解析文件'
-  return `你是一名高校教师助手。请基于课程知识库与解析文件生成结构化教案，包含教学目标、重难点、教学过程（导入/讲授/练习/总结）、课后作业以及评价方式。\n课程：${title}\n${docInfo}\n大纲/解析内容：${outline}`
+  return `你是一名高校教师助手。请基于课程知识库与解析文件生成一份正式教案，内容包含课程基本信息、教学目标、教学重难点、教学过程、课后作业和评价方式。
+输出要求：
+1. 使用纯文本排版，不要使用Markdown格式。
+2. 不要出现#、*、|、---、反引号、HTML标签、<br>等格式符号。
+3. 不要使用Markdown表格，确需列举内容时使用“一、二、三”和“1. 2. 3.”分段。
+4. 每个小节之间保留空行，文字尽量完整、自然，便于直接复制到论文或教案文件中。
+课程：${title}
+${docInfo}
+大纲/解析内容：${outline}`
+}
+
+const cleanLessonPlanContent = (raw: string) => {
+  const lines = (raw || '')
+    .replace(/<br\s*\/?>/gi, '\n')
+    .replace(/<\/?[^>]+>/g, '')
+    .replace(/\r\n/g, '\n')
+    .replace(/\r/g, '\n')
+    .split('\n')
+
+  const cleaned = lines.map((line) => {
+    let text = line.trim()
+    if (!text) return ''
+    if (/^[-*_]{3,}$/.test(text)) return ''
+    if (/^\|?\s*:?-{2,}:?\s*(\|\s*:?-{2,}:?\s*)+\|?$/.test(text)) return ''
+
+    if (text.includes('|')) {
+      const cells = text.split('|').map(cell => cell.trim()).filter(Boolean)
+      if (cells.length === 2) {
+        text = `${cells[0]}：${cells[1]}`
+      } else if (cells.length > 2) {
+        text = cells.join('    ')
+      }
+    }
+
+    return text
+      .replace(/^#{1,6}\s*/g, '')
+      .replace(/^[-*+]\s+/g, '')
+      .replace(/\*\*(.*?)\*\*/g, '$1')
+      .replace(/\*(.*?)\*/g, '$1')
+      .replace(/`([^`]+)`/g, '$1')
+      .replace(/[|#*_`~]/g, '')
+      .replace(/\s{3,}/g, '  ')
+      .trim()
+  })
+
+  return cleaned
+    .filter((line, index, arr) => line || arr[index - 1])
+    .join('\n')
+    .trim()
 }
 
 const generatePlan = async () => {
@@ -204,6 +258,7 @@ const generatePlan = async () => {
       selectedCourseId.value || undefined,
       'lesson_plan'
     )
+    planContent.value = cleanLessonPlanContent(planContent.value)
     if (createdTaskId) {
       await aiPortalApi.updateLessonPlanTaskResult(createdTaskId, { status: 'completed', result: planContent.value })
     }
@@ -227,6 +282,7 @@ const savePlan = async () => {
     ElMessage.warning('请先生成教案')
     return
   }
+  planContent.value = cleanLessonPlanContent(planContent.value)
   await aiPortalApi.updateLessonPlanTaskResult(currentTaskId.value, {
     status: 'completed',
     result: planContent.value
@@ -235,26 +291,65 @@ const savePlan = async () => {
   await loadLessonPlanTasks()
 }
 
-const exportPlan = () => {
-  if (!planContent.value.trim()) {
-    ElMessage.error('暂无可导出的内容')
-    return
-  }
-  const filename = `${planTitle.value.trim() || '教案'}.md`
-  const blob = new Blob([planContent.value], { type: 'text/markdown;charset=utf-8' })
+const safeMarkdownFilename = (name: string) => {
+  return (name || '教案').replace(/[\\/:*?"<>|]/g, '_').trim() || '教案'
+}
+
+const downloadMarkdown = (filename: string, content: string) => {
+  const safeName = safeMarkdownFilename(filename)
+  const blob = new Blob([content], { type: 'text/markdown;charset=utf-8' })
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')
   a.href = url
-  a.download = filename
+  a.download = safeName.toLowerCase().endsWith('.md') ? safeName : `${safeName}.md`
   document.body.appendChild(a)
   a.click()
   a.remove()
   URL.revokeObjectURL(url)
 }
 
+const exportPlan = () => {
+  if (!planContent.value.trim()) {
+    ElMessage.error('暂无可导出的内容')
+    return
+  }
+  downloadMarkdown(planTitle.value.trim() || '教案', cleanLessonPlanContent(planContent.value))
+}
+
 const openTaskResult = (task: LessonPlanTask) => {
-  viewingTask.value = task
+  viewingTask.value = {
+    ...task,
+    result: cleanLessonPlanContent(task.result || '')
+  }
   taskDialogVisible.value = true
+}
+
+const downloadTaskResult = (task: LessonPlanTask) => {
+  const content = task.result || ''
+  if (!content.trim()) {
+    ElMessage.warning('该教案暂无可下载内容')
+    return
+  }
+  downloadMarkdown(task.title || '教案', cleanLessonPlanContent(content))
+}
+
+const deleteLessonPlanTask = async (task: LessonPlanTask) => {
+  await ElMessageBox.confirm(`确认删除「${task.title}」这条教案生成记录？`, '提示', { type: 'warning' })
+  deletingTaskId.value = task.id
+  try {
+    await aiPortalApi.deleteLessonPlanTask(task.id)
+    if (currentTaskId.value === task.id) {
+      currentTaskId.value = null
+    }
+    if (viewingTask.value?.id === task.id) {
+      viewingTask.value = null
+      taskDialogVisible.value = false
+    }
+    await loadLessonPlanTasks()
+    ElMessage.success('已删除')
+  } finally {
+    deletingTaskId.value = null
+  }
 }
 
 const openUploadKb = () => {
@@ -387,7 +482,7 @@ const doDeleteKb = async (row: TeacherKbDocument) => {
         </el-table-column>
         <el-table-column label="操作" width="260" fixed="right">
           <template #default="{ row }">
-            <el-button size="small" link @click="window.open(row.url, '_blank')">预览</el-button>
+            <el-button size="small" link @click="openDocumentUrl(row.url)">预览</el-button>
             <el-button size="small" link type="primary" @click="openEditKb(row)">编辑</el-button>
             <el-button size="small" link @click="openReplaceKb(row)">替换</el-button>
             <el-button size="small" link type="danger" @click="doDeleteKb(row)">删除</el-button>
@@ -464,9 +559,19 @@ const doDeleteKb = async (row: TeacherKbDocument) => {
           </template>
         </el-table-column>
         <el-table-column prop="updated_at" label="更新时间" width="180" />
-        <el-table-column label="操作" width="160">
+        <el-table-column label="操作" width="220">
           <template #default="{ row }">
             <el-button size="small" link type="primary" @click="openTaskResult(row)" :disabled="!row.result">查看</el-button>
+            <el-button size="small" link type="primary" @click="downloadTaskResult(row)" :disabled="!row.result">下载</el-button>
+            <el-button
+              size="small"
+              link
+              type="danger"
+              :loading="deletingTaskId === row.id"
+              @click="deleteLessonPlanTask(row)"
+            >
+              删除
+            </el-button>
           </template>
         </el-table-column>
       </el-table>

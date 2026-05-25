@@ -81,6 +81,15 @@ export interface AiKbDocument {
   chunk_count?: number
 }
 
+export interface AiKbDocumentPreview {
+  id: number
+  title: string
+  original_filename: string
+  file_ext: string
+  preview_text: string
+  truncated: boolean
+}
+
 export interface AiCustomModelItem {
   id: number
   name: string
@@ -300,6 +309,10 @@ export const adminAiApi = {
   },
   async deleteWorkflowDocument(docId: number) {
     await axios.delete(`${BASE_URL}/workflows/documents/${docId}`, { headers: authHeaders() })
+  },
+  async previewWorkflowDocument(docId: number) {
+    const res = await axios.get<AiKbDocumentPreview>(`${BASE_URL}/workflows/documents/${docId}/preview`, { headers: authHeaders() })
+    return res.data
   },
 
   // --------- AI 工作流：应用 ---------
