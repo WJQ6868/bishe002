@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, reactive, onMounted, onBeforeUnmount, nextTick, computed, watch } from 'vue'
+import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { 
   ChatRound, Plus, Delete, Edit, MoreFilled, 
@@ -33,6 +34,12 @@ interface ChatMessage {
   thinking?: string
   modelName?: string
   operable?: boolean // 是否可操作
+  quickAction?: QuickAction | null
+}
+
+interface QuickAction {
+  label: string
+  path: string
 }
 
 interface Session {
@@ -79,6 +86,31 @@ const floatStyle = computed(() => {
 const sessions = ref<Session[]>([])
 const currentSessionId = ref('')
 const currentSession = computed(() => sessions.value.find(s => s.id === currentSessionId.value))
+const router = useRouter()
+
+const quickActionRules: Array<{ keywords: string[]; action: QuickAction }> = [
+  { keywords: ['退课', '已选课程', '我的课程', '课程管理'], action: { label: '课程管理', path: '/student/course-management' } },
+  { keywords: ['请假', '请假申请', '病假', '事假', '销假'], action: { label: '请假', path: '/student/leave-apply' } },
+  { keywords: ['成绩查询', '查成绩', '查分', '成绩', '绩点'], action: { label: '成绩', path: '/student/grade-management' } },
+  { keywords: ['选课', '选课中心', '选课冲突', '抢课', '改选', '加选'], action: { label: '选课', path: '/student/course-select' } },
+  { keywords: ['作业', '作业提交', '作业管理'], action: { label: '作业', path: '/student/homework' } },
+  { keywords: ['课程助手', '课程问答', '课程AI'], action: { label: '课程助手', path: '/student/ai-course-assistant' } },
+  { keywords: ['办事大厅', '办事', '证明', '材料', '报到', '注册'], action: { label: '办事大厅', path: '/service/hall' } },
+  { keywords: ['客服', '人工客服'], action: { label: 'AI客服', path: '/student/ai-service' } }
+]
+
+const resolveQuickAction = (text: string): QuickAction | null => {
+  const normalized = (text || '').replace(/\s+/g, '')
+  const found = quickActionRules.find(rule => rule.keywords.some(keyword => normalized.includes(keyword)))
+  return found ? found.action : null
+}
+
+const goToQuickAction = (action?: QuickAction | null) => {
+  if (!action?.path) return
+  if (router.currentRoute.value.path !== action.path) {
+    router.push(action.path)
+  }
+}
 
 const appTitle = 'AI客服'
 
@@ -399,6 +431,7 @@ const handleSend = async (content: string = inputContent.value) => {
   if (!content.trim() || !currentSession.value) return
 
   const question = content.trim()
+  const quickAction = resolveQuickAction(question)
 
   // 1. ??????
   const userMsg: ChatMessage = {
@@ -427,7 +460,8 @@ const handleSend = async (content: string = inputContent.value) => {
     thinking: '',
     timestamp: Date.now(),
     isStreaming: true,
-    modelName: appTitle
+    modelName: appTitle,
+    quickAction
   }
   currentSession.value.messages.push(aiMsg)
   const aiMsgRef = currentSession.value.messages[currentSession.value.messages.length - 1]
@@ -658,7 +692,13 @@ const useQuickQuestion = (text: string) => {
               
               <div class="message-content-wrapper">
                 <div class="bubble" :class="msg.role">
-                    <div v-if="msg.role === 'ai'" class="markdown-body">
+                  <div v-if="msg.role === 'ai'">
+                      <div v-if="msg.quickAction && msg.content" class="bubble-action">
+                        <el-button size="small" type="primary" plain @click="goToQuickAction(msg.quickAction)">
+                          去办理
+                        </el-button>
+                      </div>
+                    <div class="markdown-body">
                       <div v-if="msg.thinking && msg.isStreaming && !msg.content" class="thinking-block">
                         <div class="thinking-title">思考过程</div>
                         <div class="thinking-content">{{ msg.thinking }}</div>
@@ -666,6 +706,7 @@ const useQuickQuestion = (text: string) => {
                       <div v-if="msg.content" class="answer-title">回答</div>
                       <div v-html="renderMarkdown(msg.content)"></div>
                     </div>
+                  </div>
                   <div v-else>{{ msg.content }}</div>
                 </div>
                 
@@ -1070,6 +1111,7 @@ const useQuickQuestion = (text: string) => {
 }
 
 .bubble {
+  position: relative;
   padding: 12px 16px;
   border-radius: 12px;
   font-size: 15px;
@@ -1086,6 +1128,7 @@ const useQuickQuestion = (text: string) => {
   border-color: rgba(180, 190, 200, 0.35);
   border-bottom-color: rgba(200, 210, 220, 0.7);
   border-top-left-radius: 2px;
+  padding-right: 112px;
 }
 .user .bubble { 
   background: rgba(64, 158, 255, 0.22);
@@ -1093,6 +1136,16 @@ const useQuickQuestion = (text: string) => {
   border-color: rgba(64, 158, 255, 0.35);
   border-bottom-color: rgba(64, 158, 255, 0.75);
   border-top-right-radius: 2px;
+}
+
+.bubble-action {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 2;
+}
+.bubble-action :deep(.el-button) {
+  min-width: 76px;
 }
 
 .message-footer {
